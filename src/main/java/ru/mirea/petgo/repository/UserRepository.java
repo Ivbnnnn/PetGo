@@ -24,7 +24,7 @@ public class UserRepository implements Repository<User> {
         String sql = "INSERT INTO users (name, email, phone, role, address, is_active) "
                 + "VALUES (?, ?, ?, ?, ?, ?)";
 
-        try (PreparedStatement statement = connection.pepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             statement.setString(1, user.getName());
             statement.setString(2, user.getEmail());
             statement.setString(3, user.getPhone());
