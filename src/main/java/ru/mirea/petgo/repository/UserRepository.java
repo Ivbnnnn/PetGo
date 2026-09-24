@@ -24,7 +24,7 @@ public class UserRepository implements Repository<User> {
         String sql = "INSERT INTO users (name, email, phone, role, address, is_active) "
                 + "VALUES (?, ?, ?, ?, ?, ?)";
 
-        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement statement = connection.pepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             statement.setString(1, user.getName());
             statement.setString(2, user.getEmail());
             statement.setString(3, user.getPhone());
@@ -95,6 +95,29 @@ public class UserRepository implements Repository<User> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, id);
             return statement.executeUpdate() > 0;
+        }
+    }
+
+    public User findByEmail(String email) throws SQLException{
+        String sql = "SELECT * FROM users WHERE email = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)){
+            statement.setString(1, email);
+            try (ResultSet resultSet = statement.executeQuery()){
+                return resultSet.next() ? mapRow(resultSet): null;
+            }
+        }
+    }
+    public List<User> findByName(String namePart) throws SQLException{
+        String sql = "SELECT * FROM users WHERE LOWER(name) LIKE LOWER(?) ORDER BY name";
+        List<User> users = new ArrayList<>();
+        try( PreparedStatement statement = connection.prepareStatement(sql)){
+            statement.setString(1,"%" + namePart + "%");
+            try(ResultSet resultSet = statement.executeQuery()){
+                while(resultSet.next()){
+                    users.add(mapRow(resultSet));
+                }
+            }
+            return users;
         }
     }
 
