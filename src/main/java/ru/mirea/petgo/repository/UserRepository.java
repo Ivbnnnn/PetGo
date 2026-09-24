@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class UserRepository implements Repository<User> {
     private final Connection connection;
@@ -98,6 +99,28 @@ public class UserRepository implements Repository<User> {
         }
     }
 
+    public User findByEmail(String email) throws SQLException{
+        Stirng sql = "SELECT * FROM users WHERE email = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)){
+            statement.setString(1, email);
+            try (ResulSet resultSet = statement.executeQuery()){
+                return resultSet.next() ? mapRow(resultSet): null;
+            }
+        }
+    }
+    public List<User> findByName(String namePart) throws SQLEsception{
+        String sql = "SELECT * FROM users WHERE LOWER(name) LIKE LOWER(?) ORDER BY name";
+        List<User> users = new ArrayList<>();
+        try( PrepareStatement statement = connection.prepareStatement(sql)){
+            statement.setString(1,"%" + namePart + "%");
+            try(ResulSet resultSet = statement.executeQuery()){
+                while(resultSet.next()){
+                    users.add(mapRow(resultSet))
+                }
+            }
+        }
+    }
+    public 
     private User mapRow(ResultSet resultSet) throws SQLException {
         User user = new User();
         user.setId(resultSet.getInt("id"));
