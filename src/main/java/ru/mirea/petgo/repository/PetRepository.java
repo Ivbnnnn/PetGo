@@ -2,6 +2,7 @@ package ru.mirea.petgo.repository;
 
 import ru.mirea.petgo.model.Pet;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public class PetRepository implements Repository<Pet> {
@@ -115,5 +117,97 @@ public class PetRepository implements Repository<Pet> {
             pet.setCreatedAt(createdAt.toLocalDateTime());
         }
         return pet;
+    }
+
+
+    public List<Pet> findByName(String name) throws SQLException {
+        String sql = "SELECT * FROM pets WHERE name ILIKE ? ORDER BY name";
+        List<Pet> pets = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)){
+            statement.setString(1,"%" + name + "%" );
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) pets.add(mapRow(rs));
+            }
+        }
+        return pets;
+    }
+
+    public List<Pet> findByOwnerId(int ownerId) throws SQLException {
+        String sql = "SELECT * FROM pets WHERE owner_id = ? ORDER BY name";
+        List<Pet> pets = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, ownerId);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) pets.add(mapRow(rs));
+            }
+        }
+        return pets;
+    }
+
+    public List<Pet> findByBreed(String breed) throws SQLException {
+        String sql = "SELECT * FROM pets WHERE breed ILIKE ? ORDER BY breed";
+        List<Pet> pets = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, "%" + breed + "%");
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) pets.add(mapRow(rs));
+            }        
+        }
+        return pets;
+    }
+
+    public List<Pet> findByWeightRange(BigDecimal min, BigDecimal max) throws SQLException {
+        String sql = "SELECT * FROM pets WHERE weight BETWEEN ? AND ? ORDER BY weight";
+        List<Pet> pets = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setBigDecimal(1, min);
+            statement.setBigDecimal(2, max);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) pets.add(mapRow(rs));
+            }
+        }
+        return pets;
+    }
+
+    public List<Pet> findByAgeRange(int minAge, int maxAge) throws SQLException {
+        String sql = "SELECT * FROM pets WHERE age BETWEEN ? AND ? ORDER BY age";
+        List<Pet> pets = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, minAge);
+            statement.setInt(2, maxAge);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) pets.add(mapRow(rs));
+            }
+        }
+        return pets;
+    }
+
+    public List<Pet> findByOwnerAndBreed(int ownerId, String breed) throws SQLException {
+        String sql = "SELECT * FROM pets WHERE owner_id = ? AND breed ILIKE ? ORDER BY name";
+        List<Pet> pets = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, ownerId);
+            statement.setString(2, "%" + breed + "%");
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) pets.add(mapRow(rs));
+            }
+        }   
+        return pets;
+    }
+
+    public List<Pet> findAllSorted(String sortBy, boolean ascending) throws SQLException {
+        Comparator<Pet> comparator = switch (sortBy) {
+            case "name"   -> Comparator.comparing(Pet::getName, String.CASE_INSENSITIVE_ORDER);
+            case "breed"  -> Comparator.comparing(Pet::getBreed, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+            case "weight" -> Comparator.comparing(Pet::getWeight, Comparator.nullsLast(BigDecimal::compareTo));
+            case "age"    -> Comparator.comparing(Pet::getAge, Comparator.nullsLast(Integer::compareTo));
+            case "id"     -> Comparator.comparingInt(Pet::getId);
+            default -> throw new IllegalArgumentException("Недопустимое поле сортировки: " + sortBy);
+        };
+        if (!ascending) comparator = comparator.reversed();
+
+        return findAll().stream()
+                .sorted(comparator)
+                .toList();
     }
 }
