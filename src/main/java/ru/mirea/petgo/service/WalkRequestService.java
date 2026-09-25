@@ -13,8 +13,8 @@ import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 public class WalkRequestService {
@@ -30,6 +30,7 @@ public class WalkRequestService {
         this.petRepository = petRepository;
         this.userRepository = userRepository;
     }
+
 
     public WalkRequest create(WalkRequest request) throws BusinessException, DatabaseException {
         validateRequest(request);
@@ -131,6 +132,7 @@ public class WalkRequestService {
             throw new DatabaseException("Ошибка удаления заявки", e);
         }
     }
+
 
     public WalkRequest acceptRequest(int requestId, int walkerId)
             throws BusinessException, DatabaseException {
@@ -267,44 +269,66 @@ public class WalkRequestService {
         return request;
     }
 
-    public List<WalkRequest> findByOwner(int ownerId) throws DatabaseException {
-        List<WalkRequest> result = new ArrayList<>();
-        for (WalkRequest r : findAll()) {
-            if (r.getOwnerId() == ownerId) {
-                result.add(r);
-            }
+
+    public List<WalkRequest> findByPetName(String petName)
+            throws BusinessException, DatabaseException {
+        if (petName == null || petName.isBlank()) {
+            throw new BusinessException("Имя питомца не может быть пустым");
         }
-        return result;
+        try {
+            return walkRequestRepository.findByPetName(petName);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска по имени питомца", e);
+        }
     }
 
-    public List<WalkRequest> findByWalker(int walkerId) throws DatabaseException {
-        List<WalkRequest> result = new ArrayList<>();
-        for (WalkRequest r : findAll()) {
-            if (r.getWalkerId() != null && r.getWalkerId() == walkerId) {
-                result.add(r);
-            }
+    public List<WalkRequest> findByDate(LocalDate date)
+            throws BusinessException, DatabaseException {
+        if (date == null) {
+            throw new BusinessException("Дата обязательна");
         }
-        return result;
+        try {
+            return walkRequestRepository.findByDate(date);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска по дате", e);
+        }
     }
+
 
     public List<WalkRequest> findByStatus(WalkStatus status) throws DatabaseException {
-        List<WalkRequest> result = new ArrayList<>();
-        for (WalkRequest r : findAll()) {
-            if (r.getStatus() == status) {
-                result.add(r);
-            }
+        try {
+            return walkRequestRepository.findByStatus(status);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска по статусу", e);
         }
-        return result;
     }
 
-    public List<WalkRequest> findByPet(int petId) throws DatabaseException {
-        List<WalkRequest> result = new ArrayList<>();
-        for (WalkRequest r : findAll()) {
-            if (r.getPetId() == petId) {
-                result.add(r);
-            }
+    public List<WalkRequest> findByOwnerId(int ownerId) throws DatabaseException {
+        try {
+            return walkRequestRepository.findByOwnerId(ownerId);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска по владельцу", e);
         }
-        return result;
+    }
+
+
+    public List<WalkRequest> findAllSorted(String field, boolean asc)
+            throws BusinessException, DatabaseException {
+        try {
+            return walkRequestRepository.findAllSorted(field, asc);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(e.getMessage());
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка сортировки заявок", e);
+        }
+    }
+
+    public List<WalkRequest> findAllSortedByPetName(boolean asc) throws DatabaseException {
+        try {
+            return walkRequestRepository.findAllSortedByPetName(asc);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка сортировки по имени питомца", e);
+        }
     }
 
     private void validateRequest(WalkRequest request) throws BusinessException {

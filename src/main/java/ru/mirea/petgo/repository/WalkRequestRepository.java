@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -90,6 +91,99 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
             return statement.executeUpdate() > 0;
         }
     }
+
+
+    public List<WalkRequest> findByPetName(String petName) throws SQLException {
+        String sql = "SELECT wr.* FROM walk_requests wr "
+                + "JOIN pets p ON wr.pet_id = p.id "
+                + "WHERE p.name ILIKE ? ORDER BY p.name";
+        List<WalkRequest> requests = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, "%" + petName + "%");
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) requests.add(mapRow(rs));
+            }
+        }
+        return requests;
+    }
+
+    public List<WalkRequest> findByDate(LocalDate date) throws SQLException {
+        String sql = "SELECT * FROM walk_requests "
+                + "WHERE DATE(walk_datetime) = ? ORDER BY walk_datetime";
+        List<WalkRequest> requests = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setDate(1, java.sql.Date.valueOf(date));
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) requests.add(mapRow(rs));
+            }
+        }
+        return requests;
+    }
+
+
+    public List<WalkRequest> findByStatus(WalkStatus status) throws SQLException {
+        String sql = "SELECT * FROM walk_requests WHERE status = ? ORDER BY walk_datetime";
+        List<WalkRequest> requests = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, status.name());
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) requests.add(mapRow(rs));
+            }
+        }
+        return requests;
+    }
+
+    public List<WalkRequest> findByOwnerId(int ownerId) throws SQLException {
+        String sql = "SELECT * FROM walk_requests WHERE owner_id = ? ORDER BY walk_datetime";
+        List<WalkRequest> requests = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, ownerId);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) requests.add(mapRow(rs));
+            }
+        }
+        return requests;
+    }
+
+
+    public List<WalkRequest> findAllSorted(String field, boolean asc) throws SQLException {
+        String column;
+        switch (field) {
+            case "walk_datetime":
+            case "created_at":
+            case "status":
+            case "price":
+            case "duration_minutes":
+                column = field;
+                break;
+            default:
+                throw new IllegalArgumentException("Недопустимое поле сортировки: " + field);
+        }
+        String direction = asc ? "ASC" : "DESC";
+        String sql = "SELECT * FROM walk_requests ORDER BY " + column + " " + direction;
+
+        List<WalkRequest> requests = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rs = statement.executeQuery()) {
+            while (rs.next()) requests.add(mapRow(rs));
+        }
+        return requests;
+    }
+
+    public List<WalkRequest> findAllSortedByPetName(boolean asc) throws SQLException {
+        String direction = asc ? "ASC" : "DESC";
+        String sql = "SELECT wr.* FROM walk_requests wr "
+                + "JOIN pets p ON wr.pet_id = p.id "
+                + "ORDER BY p.name " + direction;
+
+        List<WalkRequest> requests = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rs = statement.executeQuery()) {
+            while (rs.next()) requests.add(mapRow(rs));
+        }
+        return requests;
+    }
+
 
     private void setRequestValues(PreparedStatement statement, WalkRequest request) throws SQLException {
         statement.setInt(1, request.getPetId());
