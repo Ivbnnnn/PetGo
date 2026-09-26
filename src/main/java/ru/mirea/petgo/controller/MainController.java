@@ -20,7 +20,7 @@ public class MainController {
                 Выберите действие: 
                 """);
     }
-    
+
     public static void PetMenu(){
         System.out.println("""
                 ========= УПРАВЛЕНИЕ ПИТОМЦАМИ =========
@@ -35,6 +35,7 @@ public class MainController {
                 Выберите действие: 
                 """);
     }
+    
     public static void WalkRequestMenu(){
         System.out.println("""
                 ========= УПРАВЛЕНИЕ ЗАЯВКАМИ =========
@@ -89,4 +90,5 @@ public class MainController {
 
                 """);
     }
+
 }
