@@ -158,10 +158,62 @@ public class UserController {
         );
     }
 
+    private void findUser(){
+        try{
+            System.out.println("""
+                1. Найти по имени
+                2. Найти по почте
+                3. Выйти
+                """);
+            System.out.print("Введите вариант:");
+            String choice = scanner.nextLine();
+            switch (choice) {
+                case "1":
+                    System.out.print("Введите имя:");
+                    String name = scanner.nextLine();
+                    List<User> users = userService.findByName(name);
+                    if (users.isEmpty()){
+                        System.out.println("Нет пользователей с таким именем");
+                        return;
+                    }
+                    for (User user : users){
+                        printUser(user);
+                    }
+                    break;
+                case "2":
+                    System.out.print("Введите почту:");
+                    String email = scanner.nextLine();
+                    User user = userService.findByEmail(email);
+                    printUser(user);
+                    break;
+                case "3":
+                    return;
+                    
+            
+                default:
+                    System.out.println("Нет такого варианта");
+            }
+        } catch (BusinessException e){
+            System.out.println(e.getMessage());
+
+        } catch (EntityNotFoundException e){
+            System.out.println(e.getMessage());
+
+        } catch (DatabaseException e){
+            System.out.println(e.getMessage());
+
+        }
+        
+            
+    }
+
     public void ShowMenu() {
         boolean running = true;
 
         while (running) {
+            try{
+
+            
             System.out.println("""
                     ========= УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ =========
                     1. Добавить пользователя
@@ -193,6 +245,7 @@ public class UserController {
                     deleteUser();
                     break;
                 case "6":
+                    findUser();
                     break;
                 case "7":
                     running = false;
@@ -200,6 +253,9 @@ public class UserController {
                 default:
                     System.out.println("Такого пункта нет.");
             }
+        } catch(NumberFormatException e){
+            System.out.println("Введите корректные данные: " + e.getMessage());
         }
+    }
     }
 }

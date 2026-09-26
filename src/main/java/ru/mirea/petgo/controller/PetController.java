@@ -1,11 +1,12 @@
 package ru.mirea.petgo.controller;
 
 import ru.mirea.petgo.exception.BusinessException;
+import ru.mirea.petgo.exception.DatabaseException;
+import ru.mirea.petgo.exception.EntityNotFoundException;
 import ru.mirea.petgo.model.Pet;
 import ru.mirea.petgo.service.PetService;
 
 import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -28,7 +29,7 @@ public class PetController {
             System.out.println("Вес, возраст и ID владельца должны быть числами.");
         } catch (BusinessException e) {
             System.out.println(e.getMessage());
-        } catch (SQLException e) {
+        } catch (DatabaseException e) {
             System.out.println("Ошибка базы данных: " + e.getMessage());
         }
     }
@@ -47,7 +48,7 @@ public class PetController {
                 printPet(pet);
             }
 
-        } catch (SQLException e) {
+        } catch (DatabaseException e) {
             System.out.println("Ошибка базы данных: " + e.getMessage());
         }
     }
@@ -68,7 +69,7 @@ public class PetController {
 
         } catch (NumberFormatException e) {
             System.out.println("ID должен быть числом.");
-        } catch (SQLException e) {
+        } catch (DatabaseException e) {
             System.out.println("Ошибка базы данных: " + e.getMessage());
         }
     }
@@ -93,7 +94,7 @@ public class PetController {
             System.out.println("Вес, возраст и ID владельца должны быть числами.");
         } catch (BusinessException e) {
             System.out.println(e.getMessage());
-        } catch (SQLException e) {
+        } catch (DatabaseException e) {
             System.out.println("Ошибка базы данных: " + e.getMessage());
         }
     }
@@ -110,7 +111,7 @@ public class PetController {
             System.out.println("ID должен быть числом.");
         } catch (BusinessException e) {
             System.out.println(e.getMessage());
-        } catch (SQLException e) {
+        } catch (DatabaseException e) {
             System.out.println("Ошибка базы данных: " + e.getMessage());
         }
     }
@@ -151,10 +152,71 @@ public class PetController {
         );
     }
 
+    private void findPet(){
+        try{
+            System.out.println("""
+                1. Найти по ID хозяина
+                2. Найти по имени
+                3. Найти по весу
+                4. Выйти
+                """);
+            String choice = scanner.nextLine();
+            switch (choice) {
+                case "1":{
+                    System.out.print("Ввидет ID хозяина: ");
+                    Integer ownerId = Integer.parseInt(scanner.nextLine());
+                    List<Pet> pets= petService.getByOwner(ownerId);
+                    if (pets.isEmpty()){
+                        System.out.println("У пользователя с ID" + ownerId + "нет питомцев");
+                    }
+                    for (Pet pet : pets){
+                        printPet(pet);
+                    }
+                    break;}
+                case "2":{
+                    System.out.print("Ввидет имя питомца: ");
+                    String name = scanner.nextLine();
+                    List<Pet> pets= petService.searchByName(name);
+                    if (pets.isEmpty()){
+                        System.out.println("Нет питомцев с именем" + pets);
+                    }
+                    for (Pet pet : pets){
+                        printPet(pet);
+                    }
+                    break;}
+                case "3":{
+                    System.out.print("Минимальный вес: ");
+                    BigDecimal minWeight = new BigDecimal(scanner.nextLine());
+                    System.out.print("Максимальный вес: ");
+                    BigDecimal maxWeight = new BigDecimal(scanner.nextLine());
+                    List<Pet> pets = petService.filterByWeight(minWeight, maxWeight);
+                    if (pets.isEmpty()){
+                        System.out.println("Нет питомцев с именем" + pets);
+                    }
+                    for (Pet pet : pets){
+                        printPet(pet);
+                    }
+                    break;}
+                case "4":
+                    return;
+            
+                default:
+                    System.out.println("Нет такого варианта");
+            }
+        } catch (DatabaseException e){
+            System.out.println(e.getMessage());
+        } catch (NumberFormatException e){
+            System.out.println("Введите корректные данные:" + e.getMessage());
+        }
+    }
+
     public void showMenu() {
         boolean running = true;
 
         while (running) {
+
+
+            
             System.out.println("""
                     ========= УПРАВЛЕНИЕ ПИТОМЦАМИ =========
                     1. Добавить питомца
@@ -187,6 +249,7 @@ public class PetController {
                     deletePet();
                     break;
                 case "6":
+                    findPet();
                     break;
                 case "7":
                     running = false;
@@ -194,6 +257,7 @@ public class PetController {
                 default:
                     System.out.println("Такого пункта нет.");
             }
-        }
+
+    }
     }
 }

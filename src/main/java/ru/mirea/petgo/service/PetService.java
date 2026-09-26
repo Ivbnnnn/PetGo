@@ -2,6 +2,7 @@
 package ru.mirea.petgo.service;
 
 import ru.mirea.petgo.exception.BusinessException;
+import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.model.Pet;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
@@ -19,44 +20,98 @@ public class PetService {
         this.userRepository = userRepository;
     }
 
-    public Pet createPet(Pet pet) throws SQLException, BusinessException {
+    public Pet createPet(Pet pet) throws BusinessException, DatabaseException {
         validate(pet);
-        if (userRepository.findById(pet.getOwnerId()) == null) {
-            throw new BusinessException("Владелец с id=" + pet.getOwnerId() + " не найден");
+        try {
+            if (userRepository.findById(pet.getOwnerId()) == null) {
+                throw new BusinessException("Владелец с id=" + pet.getOwnerId() + " не найден");
+            }
+            return petRepository.save(pet);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка сохранения питомца", e);
         }
-        return petRepository.save(pet);
     }
 
-    public Pet updatePet(Pet pet) throws SQLException, BusinessException {
+    public Pet updatePet(Pet pet) throws BusinessException, DatabaseException {
         validate(pet);
-        if (petRepository.findById(pet.getId()) == null) {
-            throw new BusinessException("Питомец с id=" + pet.getId() + " не найден");
+        try {
+            if (petRepository.findById(pet.getId()) == null) {
+                throw new BusinessException("Питомец с id=" + pet.getId() + " не найден");
+            }
+            if (!petRepository.update(pet)) {
+                throw new BusinessException("Не удалось обновить питомца id=" + pet.getId());
+            }
+            return pet;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка обновления питомца id=" + pet.getId(), e);
         }
-        if (!petRepository.update(pet)) {
-            throw new BusinessException("Не удалось обновить питомца id=" + pet.getId());
-        }
-        return pet;
     }
 
-    public void deletePet(int id) throws SQLException, BusinessException {
-        if (petRepository.findById(id) == null) {
-            throw new BusinessException("Питомец с id=" + id + " не найден");
+    public void deletePet(int id) throws BusinessException, DatabaseException {
+        try {
+            if (petRepository.findById(id) == null) {
+                throw new BusinessException("Питомец с id=" + id + " не найден");
+            }
+            petRepository.deleteById(id);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка удаления питомца id=" + id, e);
         }
-        petRepository.deleteById(id);
     }
 
-    public Pet getById(int id) throws SQLException { return petRepository.findById(id); }
-    public List<Pet> getAll() throws SQLException { return petRepository.findAll(); }
-    public List<Pet> searchByName(String name) throws SQLException { return petRepository.findByName(name); }
-    public List<Pet> getByOwner(int ownerId) throws SQLException { return petRepository.findByOwnerId(ownerId); }
-    public List<Pet> filterByWeight(BigDecimal min, BigDecimal max) throws SQLException {
-        return petRepository.findByWeightRange(min, max);
+    public Pet getById(int id) throws DatabaseException {
+        try {
+            return petRepository.findById(id);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска питомца по id=" + id, e);
+        }
     }
-    public List<Pet> filterByAge(int min, int max) throws SQLException {
-        return petRepository.findByAgeRange(min, max);
+
+    public List<Pet> getAll() throws DatabaseException {
+        try {
+            return petRepository.findAll();
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка получения списка питомцев", e);
+        }
     }
-    public List<Pet> sorted(String sortBy, boolean asc) throws SQLException {
-        return petRepository.findAllSorted(sortBy, asc);
+
+    public List<Pet> searchByName(String name) throws DatabaseException {
+        try {
+            return petRepository.findByName(name);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска питомцев по имени", e);
+        }
+    }
+
+    public List<Pet> getByOwner(int ownerId) throws DatabaseException {
+        try {
+            return petRepository.findByOwnerId(ownerId);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска питомцев владельца id=" + ownerId, e);
+        }
+    }
+
+    public List<Pet> filterByWeight(BigDecimal min, BigDecimal max) throws DatabaseException {
+        try {
+            return petRepository.findByWeightRange(min, max);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка фильтрации питомцев по весу", e);
+        }
+    }
+
+    public List<Pet> filterByAge(int min, int max) throws DatabaseException {
+        try {
+            return petRepository.findByAgeRange(min, max);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка фильтрации питомцев по возрасту", e);
+        }
+    }
+
+    public List<Pet> sorted(String sortBy, boolean asc) throws DatabaseException {
+        try {
+            return petRepository.findAllSorted(sortBy, asc);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка сортировки питомцев", e);
+        }
     }
 
     private void validate(Pet pet) throws BusinessException {

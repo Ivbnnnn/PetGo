@@ -47,6 +47,9 @@ public class Main {
                     case "2":
                         petController.showMenu();
                         break;
+                    case "9":
+                        running = false;
+                        break;
                     default:
                         break;
                 }
