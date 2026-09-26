@@ -15,7 +15,14 @@ services:
       - pg_data:/var/lib/postgresql
       - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
       - ./src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/2-data.sql
-      
+
+  adminer:
+    image: adminer:latest
+    container_name: pet-adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
 
 volumes:
   pg_data:

@@ -1,7 +1,7 @@
-/*
+
 package ru.mirea.petgo.service;
 
-import ru.mirea.petgo.exception.ValidationException;
+import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.model.Pet;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
@@ -19,28 +19,28 @@ public class PetService {
         this.userRepository = userRepository;
     }
 
-    public Pet createPet(Pet pet) throws SQLException, ValidationException {
+    public Pet createPet(Pet pet) throws SQLException, BusinessException {
         validate(pet);
         if (userRepository.findById(pet.getOwnerId()) == null) {
-            throw new ValidationException("Владелец с id=" + pet.getOwnerId() + " не найден");
+            throw new BusinessException("Владелец с id=" + pet.getOwnerId() + " не найден");
         }
         return petRepository.save(pet);
     }
 
-    public Pet updatePet(Pet pet) throws SQLException, ValidationException {
+    public Pet updatePet(Pet pet) throws SQLException, BusinessException {
         validate(pet);
         if (petRepository.findById(pet.getId()) == null) {
-            throw new ValidationException("Питомец с id=" + pet.getId() + " не найден");
+            throw new BusinessException("Питомец с id=" + pet.getId() + " не найден");
         }
         if (!petRepository.update(pet)) {
-            throw new ValidationException("Не удалось обновить питомца id=" + pet.getId());
+            throw new BusinessException("Не удалось обновить питомца id=" + pet.getId());
         }
         return pet;
     }
 
-    public void deletePet(int id) throws SQLException, ValidationException {
+    public void deletePet(int id) throws SQLException, BusinessException {
         if (petRepository.findById(id) == null) {
-            throw new ValidationException("Питомец с id=" + id + " не найден");
+            throw new BusinessException("Питомец с id=" + id + " не найден");
         }
         petRepository.deleteById(id);
     }
@@ -59,15 +59,15 @@ public class PetService {
         return petRepository.findAllSorted(sortBy, asc);
     }
 
-    private void validate(Pet pet) throws ValidationException {
+    private void validate(Pet pet) throws BusinessException {
         if (pet.getName() == null || pet.getName().isBlank())
-            throw new ValidationException("Кличка не может быть пустой");
+            throw new BusinessException("Кличка не может быть пустой");
         if (pet.getOwnerId() <= 0)
-            throw new ValidationException("Некорректный id владельца");
+            throw new BusinessException("Некорректный id владельца");
         if (pet.getWeight() != null && pet.getWeight().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidationException("Вес должен быть положительным");
+            throw new BusinessException("Вес должен быть положительным");
         if (pet.getAge() != null && pet.getAge() < 0)
-            throw new ValidationException("Возраст не может быть отрицательным");
+            throw new BusinessException("Возраст не может быть отрицательным");
     }
 }
-    */
+    
