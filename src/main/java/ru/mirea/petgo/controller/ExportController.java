@@ -17,7 +17,16 @@ public class ExportController {
     public void showMenu() {
         boolean running = true;
         while (running) {
-            MainController.ExportMenu();
+            System.out.println("""
+            ========= ЭКСПОРТ ДАННЫХ =========
+            1. Экспорт заявок в Excel (.xlsx)
+            2. Экспорт заявок в CSV (.csv)
+            3. Экспорт в оба формата
+            0. Назад
+            ================================================
+            Выберите действие: 
+            
+            """);
             String choice = scanner.nextLine().trim();
 
             try {

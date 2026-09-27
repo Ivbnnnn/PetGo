@@ -18,7 +18,15 @@ public class DatabaseController {
     public void showMenu() {
         boolean running = true;
         while (running) {
-            MainController.DatabaseMenu();
+            System.out.println("""
+                ========= ВЫВОД ТАБЛИЦ БД =========
+                1. Вывести все таблицы
+                2. Вывести одну таблицу
+                0. Назад
+                ================================================
+                Выберите действие: 
+                
+                """);
             String choice = scanner.nextLine().trim();
 
             try {
