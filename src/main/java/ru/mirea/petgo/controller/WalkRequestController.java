@@ -196,12 +196,12 @@ public class WalkRequestController {
         } catch (NumberFormatException e) {
             System.out.print("Введите корректный ID хозяина");
         }
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.mm.yyyy HH:mm");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
         System.out.print("Введите время прогулки: ");
         try {
             walkRequest.setWalkDateTime(LocalDateTime.parse(scanner.nextLine(), formatter));
         } catch (DateTimeParseException e) {
-            System.out.print("Введите корректное время формата dd.mm.yyyy HH:mm");
+            System.out.print("Введите корректное время формата dd.MM.yyyy HH:mm");
         }
         System.out.print("Введите длительность прогулки в минутах: ");
         try {
@@ -235,12 +235,12 @@ public class WalkRequestController {
         } catch (NumberFormatException e) {
             System.out.print("Введите корректный ID выгульщика");
         }
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.mm.yyyy HH:mm");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
         System.out.print("Введите время прогулки: ");
         try {
             walkRequest.setWalkDateTime(LocalDateTime.parse(scanner.nextLine(), formatter));
         } catch (DateTimeParseException e) {
-            System.out.print("Введите корректное время формата dd.mm.yyyy HH:mm");
+            System.out.print("Введите корректное время формата dd.MM.yyyy HH:mm");
         }
         System.out.print("Введите длительность прогулки в минутах: ");
         try {
