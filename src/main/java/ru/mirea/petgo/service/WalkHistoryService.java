@@ -37,8 +37,8 @@ public class WalkHistoryService {
         if (request == null) {
             throw new BusinessException("Заявка с id=" + history.getWalkRequestId() + " не найдена");
         }
-        if (request.getStatus() != WalkStatus.IN_PROGRESS) {
-            throw new BusinessException("Историю можно создать только для прогулки в статусе IN_PROGRESS");
+        if (request.getStatus() != WalkStatus.COMPLETED) {
+            throw new BusinessException("Историю можно создать только для прогулки в статусе COMPLETED. Текущий статус: " + request.getStatus());
         }
 
         WalkHistory existing;
@@ -53,22 +53,11 @@ public class WalkHistoryService {
 
         history.setCompletedAt(LocalDateTime.now());
 
-        WalkHistory saved;
         try {
-            saved = walkHistoryRepository.save(history);
+            return walkHistoryRepository.save(history);
         } catch (SQLException e) {
             throw new DatabaseException("Ошибка сохранения истории", e);
         }
-
-        request.setStatus(WalkStatus.COMPLETED);
-        request.setUpdatedAt(LocalDateTime.now());
-        try {
-            walkRequestRepository.update(request);
-        } catch (SQLException e) {
-            throw new DatabaseException("Ошибка обновления заявки", e);
-        }
-
-        return saved;
     }
 
     public WalkHistory findById(int id) throws EntityNotFoundException, DatabaseException {
