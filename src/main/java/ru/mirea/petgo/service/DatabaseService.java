@@ -23,7 +23,7 @@ public class DatabaseService {
 
     public TableData getTableData(String tableName) throws DatabaseException {
         if (!TABLES.contains(tableName)) {
-            throw new DatabaseException("Неизвестная таблица: " + tableName);
+            throw new DatabaseException("Неизвестная таблица: " + tableName, null);
         }
 
         String sql = "SELECT * FROM " + tableName;
@@ -57,7 +57,7 @@ public class DatabaseService {
 
     public int getRowCount(String tableName) throws DatabaseException {
         if (!TABLES.contains(tableName)) {
-            throw new DatabaseException("Неизвестная таблица: " + tableName);
+            throw new DatabaseException("Неизвестная таблица: " + tableName, null);
         }
         String sql = "SELECT COUNT(*) FROM " + tableName;
 

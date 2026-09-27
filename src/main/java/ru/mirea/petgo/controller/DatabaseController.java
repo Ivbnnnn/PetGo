@@ -20,18 +20,18 @@ public class DatabaseController {
         while (running) {
             MainController.DatabaseMenu();
             String choice = scanner.nextLine().trim();
-        }
 
-        try {
-            switch (choice) {
-                case "1" -> showAllTables();
-                case "2" -> showOneTable();
-                case "0" -> running = false;
-                default -> System.out.println("Ошибка: неверный пункт меню.");
+            try {
+                switch (choice) {
+                    case "1" -> showAllTables();
+                    case "2" -> showOneTable();
+                    case "0" -> running = false;
+                    default -> System.out.println("Ошибка: неверный пункт меню.");
+                }
             }
-        }
-        catch (DatabaseException e) {
-            System.out.println("Ошибка БД: " + e.getMessage());
+            catch (DatabaseException e) {
+                System.out.println("Ошибка БД: " + e.getMessage());
+            }
         }
     }
 
