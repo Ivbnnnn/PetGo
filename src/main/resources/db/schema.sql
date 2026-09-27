@@ -35,7 +35,7 @@ CREATE TABLE walk_requests (
     walk_datetime     TIMESTAMP NOT NULL,
     duration_minutes  INT NOT NULL CHECK (duration_minutes > 0),
     walk_address      VARCHAR(200) NOT NULL,
-    status            VARCHAR(20) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED','PENDING','CONFIRMED','IN_PROGRESS','COMPLETED','CANCELLED')),
+    status            VARCHAR(20) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED', 'IN_PROGRESS','COMPLETED','CANCELLED')),
     description       TEXT,
     price             DECIMAL(10, 2) CHECK (price >= 0),
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
