@@ -24,13 +24,12 @@ public class WalkRequestService {
     private final UserRepository userRepository;
 
     public WalkRequestService(WalkRequestRepository walkRequestRepository,
-                              PetRepository petRepository,
-                              UserRepository userRepository) {
+            PetRepository petRepository,
+            UserRepository userRepository) {
         this.walkRequestRepository = walkRequestRepository;
         this.petRepository = petRepository;
         this.userRepository = userRepository;
     }
-
 
     public WalkRequest create(WalkRequest request) throws BusinessException, DatabaseException {
         validateRequest(request);
@@ -111,7 +110,9 @@ public class WalkRequestService {
         if (existing == null) {
             throw new BusinessException("Заявка с id=" + request.getId() + " не найдена");
         }
-
+        if (existing.getStatus() != request.getStatus()) {
+            throw new BusinessException("Для изменения статуса используйте startWalk / completeWalk / cancelRequest");
+        }
         try {
             boolean updated = walkRequestRepository.update(request);
             if (!updated) {
@@ -133,48 +134,6 @@ public class WalkRequestService {
         }
     }
 
-
-    public WalkRequest acceptRequest(int requestId, int walkerId)
-            throws BusinessException, DatabaseException {
-        WalkRequest request;
-        try {
-            request = walkRequestRepository.findById(requestId);
-        } catch (SQLException e) {
-            throw new DatabaseException("Ошибка поиска заявки", e);
-        }
-        if (request == null) {
-            throw new BusinessException("Заявка с id=" + requestId + " не найдена");
-        }
-
-        if (request.getStatus() != WalkStatus.PENDING && request.getStatus() != WalkStatus.CREATED) {
-            throw new BusinessException("Нельзя взять заявку в статусе " + request.getStatus());
-        }
-
-        User walker;
-        try {
-            walker = userRepository.findById(walkerId);
-        } catch (SQLException e) {
-            throw new DatabaseException("Ошибка поиска выгульщика", e);
-        }
-        if (walker == null) {
-            throw new BusinessException("Выгульщик с id=" + walkerId + " не найден");
-        }
-        if (walker.getRole() != UserRole.WALKER) {
-            throw new BusinessException("Пользователь не является выгульщиком");
-        }
-
-        request.setWalkerId(walkerId);
-        request.setStatus(WalkStatus.CONFIRMED);
-        request.setUpdatedAt(LocalDateTime.now());
-
-        try {
-            walkRequestRepository.update(request);
-        } catch (SQLException e) {
-            throw new DatabaseException("Ошибка обновления заявки", e);
-        }
-        return request;
-    }
-
     public WalkRequest startWalk(int requestId, int walkerId)
             throws BusinessException, DatabaseException {
         WalkRequest request;
@@ -187,13 +146,25 @@ public class WalkRequestService {
             throw new BusinessException("Заявка с id=" + requestId + " не найдена");
         }
 
-        if (request.getStatus() != WalkStatus.CONFIRMED) {
-            throw new BusinessException("Начать прогулку можно только из статуса CONFIRMED");
+        if (request.getStatus() != WalkStatus.CREATED) {
+            throw new BusinessException("Начать прогулку можно только из статуса CREATED");
         }
-        if (request.getWalkerId() == null || request.getWalkerId() != walkerId) {
+        if (request.getWalkerId() != null && request.getWalkerId() != walkerId) {
             throw new BusinessException("Эту заявку выполняет другой выгульщик");
         }
-
+        User walker;
+        try {
+            walker = userRepository.findById(walkerId);
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска выгульщика", e);
+        }
+        if (walker == null) {
+            throw new BusinessException("Выгульщик с id=" + walkerId + " не найден");
+        }
+        if (walker.getRole() != UserRole.WALKER) {
+            throw new BusinessException("Пользователь не является выгульщиком");
+        }
+        request.setWalkerId(walkerId);
         request.setStatus(WalkStatus.IN_PROGRESS);
         request.setUpdatedAt(LocalDateTime.now());
 
@@ -269,7 +240,6 @@ public class WalkRequestService {
         return request;
     }
 
-
     public List<WalkRequest> findByPetName(String petName)
             throws BusinessException, DatabaseException {
         if (petName == null || petName.isBlank()) {
@@ -294,7 +264,6 @@ public class WalkRequestService {
         }
     }
 
-
     public List<WalkRequest> findByStatus(WalkStatus status) throws DatabaseException {
         try {
             return walkRequestRepository.findByStatus(status);
@@ -310,7 +279,6 @@ public class WalkRequestService {
             throw new DatabaseException("Ошибка поиска по владельцу", e);
         }
     }
-
 
     public List<WalkRequest> findAllSorted(String field, boolean asc)
             throws BusinessException, DatabaseException {
