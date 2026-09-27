@@ -1,13 +1,19 @@
 package ru.mirea.petgo;
 
+import ru.mirea.petgo.controller.FilterRequestController;
 import ru.mirea.petgo.controller.MainController;
 import ru.mirea.petgo.controller.PetController;
+import ru.mirea.petgo.controller.SortRequestController;
 import ru.mirea.petgo.controller.UserController;
+import ru.mirea.petgo.controller.WalkHistoryController;
+import ru.mirea.petgo.controller.WalkRequestController;
+import ru.mirea.petgo.controller.StatisticsController;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkHistoryRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
 import ru.mirea.petgo.service.PetService;
+import ru.mirea.petgo.service.StatisticsService;
 import ru.mirea.petgo.service.UserService;
 import ru.mirea.petgo.service.WalkHistoryService;
 import ru.mirea.petgo.service.WalkRequestService;
@@ -31,9 +37,15 @@ public class Main {
             UserService userService = new UserService(userRepository);
             WalkHistoryService walkHistoryService = new WalkHistoryService(walkHistoryRepository, walkRequestRepository);
             WalkRequestService walkRequestService = new WalkRequestService(walkRequestRepository, petRepository, userRepository);
+            StatisticsService statisticsService = new StatisticsService(userRepository, petRepository, walkRequestRepository);
 
             UserController userController = new UserController(scanner, userService);
             PetController petController = new PetController(scanner, petService);
+            WalkRequestController walkRequestController = new WalkRequestController(scanner, walkRequestService);
+            FilterRequestController filterRequestController = new FilterRequestController(scanner, walkRequestService);
+            SortRequestController sortRequestController = new SortRequestController(scanner, walkRequestService);
+            StatisticsController statisticsController = new StatisticsController(scanner, statisticsService);
+            WalkHistoryController walkHistoryController = new WalkHistoryController(scanner, walkHistoryService);
             boolean running = true;
 
             while (running) {
@@ -47,11 +59,26 @@ public class Main {
                     case "2":
                         petController.showMenu();
                         break;
-                    case "9":
+                    case "3":
+                        walkRequestController.showMenu();
+                        break;
+                    case "4":
+                        filterRequestController.showMenu();
+                        break;
+                    case "5":
+                        sortRequestController.showMenu();
+                        break;
+                    case "6":
+                        walkHistoryController.showMenu();
+                        break;
+                    case "7":
+                        statisticsController.ShowMenu();
+                        break;
+                    case "0":
                         running = false;
                         break;
                     default:
-                        break;
+                        System.out.println("Нет такого пункта");
                 }
             }
         } catch (SQLException e) {

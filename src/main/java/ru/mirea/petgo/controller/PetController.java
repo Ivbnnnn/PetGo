@@ -2,7 +2,7 @@ package ru.mirea.petgo.controller;
 
 import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.exception.DatabaseException;
-import ru.mirea.petgo.exception.EntityNotFoundException;
+
 import ru.mirea.petgo.model.Pet;
 import ru.mirea.petgo.service.PetService;
 

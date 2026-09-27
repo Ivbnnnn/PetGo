@@ -2,6 +2,7 @@ package ru.mirea.petgo.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 
@@ -57,6 +58,8 @@ public class WalkRequestController {
             System.out.print("Введите Id прогулки: ");
             WalkRequest req = walkRequestService.findById(Integer.parseInt(scanner.nextLine()));
             printRequest(req);
+        } catch (NumberFormatException e) {
+            System.out.println("Введите корректный ID.");
         } catch (EntityNotFoundException e) {
             System.out.println(e.getMessage());
         } catch (DatabaseException e) {
@@ -72,6 +75,8 @@ public class WalkRequestController {
             readRequestDataForUpdate(req);
             walkRequestService.update(req);
             System.out.println("Данные успешно обновлены");
+        } catch (NumberFormatException e) {
+            System.out.println("Введите корректный ID.");
         } catch (EntityNotFoundException e) {
             System.out.println(e.getMessage());
         } catch (DatabaseException e) {
@@ -86,6 +91,8 @@ public class WalkRequestController {
             System.out.print("Введите ID прогулки для удаления: ");
             walkRequestService.delete(Integer.parseInt(scanner.nextLine()));
             System.out.println("Заявка успешно удалена.");
+        } catch (NumberFormatException e) {
+            System.out.println("Введите корректный ID.");
         } catch (DatabaseException e) {
             System.out.println(e.getMessage());
         } catch (EntityNotFoundException e) {
@@ -151,6 +158,7 @@ public class WalkRequestController {
                         break;
                     case "4":
                         running = false;
+                        break;
                     default:
                         System.out.println("Нет такого варианта");
                 }
@@ -192,7 +200,7 @@ public class WalkRequestController {
         System.out.print("Введите время прогулки: ");
         try {
             walkRequest.setWalkDateTime(LocalDateTime.parse(scanner.nextLine(), formatter));
-        } catch (NumberFormatException e) {
+        } catch (DateTimeParseException e) {
             System.out.print("Введите корректное время формата dd.mm.yyyy HH:mm");
         }
         System.out.print("Введите длительность прогулки в минутах: ");
@@ -231,7 +239,7 @@ public class WalkRequestController {
         System.out.print("Введите время прогулки: ");
         try {
             walkRequest.setWalkDateTime(LocalDateTime.parse(scanner.nextLine(), formatter));
-        } catch (NumberFormatException e) {
+        } catch (DateTimeParseException e) {
             System.out.print("Введите корректное время формата dd.mm.yyyy HH:mm");
         }
         System.out.print("Введите длительность прогулки в минутах: ");
