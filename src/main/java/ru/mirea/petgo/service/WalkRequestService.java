@@ -113,6 +113,7 @@ public class WalkRequestService {
         if (existing.getStatus() != request.getStatus()) {
             throw new BusinessException("Для изменения статуса используйте startWalk / completeWalk / cancelRequest");
         }
+        validateRequestRelations(request);
         try {
             boolean updated = walkRequestRepository.update(request);
             if (!updated) {
@@ -120,6 +121,48 @@ public class WalkRequestService {
             }
         } catch (SQLException e) {
             throw new DatabaseException("Ошибка обновления заявки", e);
+        }
+    }
+
+    private void validateRequestRelations(WalkRequest request)
+            throws BusinessException, DatabaseException {
+        Pet pet;
+        User owner;
+
+        try {
+            pet = petRepository.findById(request.getPetId());
+            owner = userRepository.findById(request.getOwnerId());
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка проверки связей заявки", e);
+        }
+
+        if (pet == null) {
+            throw new BusinessException("Питомец с id=" + request.getPetId() + " не найден");
+        }
+        if (owner == null) {
+            throw new BusinessException("Владелец с id=" + request.getOwnerId() + " не найден");
+        }
+        if (pet.getOwnerId() != owner.getId()) {
+            throw new BusinessException("Питомец не принадлежит этому владельцу");
+        }
+        if (owner.getRole() != UserRole.OWNER) {
+            throw new BusinessException("Пользователь не является владельцем");
+        }
+
+        if (request.getWalkerId() != null) {
+            User walker;
+            try {
+                walker = userRepository.findById(request.getWalkerId());
+            } catch (SQLException e) {
+                throw new DatabaseException("Ошибка поиска выгульщика", e);
+            }
+
+            if (walker == null) {
+                throw new BusinessException("Выгульщик с id=" + request.getWalkerId() + " не найден");
+            }
+            if (walker.getRole() != UserRole.WALKER) {
+                throw new BusinessException("Пользователь не является выгульщиком");
+            }
         }
     }
 
