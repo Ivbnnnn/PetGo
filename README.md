@@ -4,5 +4,15 @@
 
 
 # Запуск проекта
-1. поднимаем бд через докер композ
-2. запускаем main.java через редактор кода (прямо над функцией main будет кнопка run)
+Для окна Hello World нужна Java 17 или новее и Maven. Из корня проекта выполните:
+
+```powershell
+mvn javafx:run
+```
+
+Также можно запустить метод `main` в `Main.java` кнопкой Run в редакторе.
+
+# Подключение к базе данных
+Настройки PostgreSQL находятся в `src/main/resources/application.properties`:
+`db.url`, `db.user`, `db.password`. Их можно переопределить переменными
+окружения `DB_URL`, `DB_USER`, `DB_PASSWORD`.
