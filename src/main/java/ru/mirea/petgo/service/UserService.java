@@ -3,9 +3,10 @@ package ru.mirea.petgo.service;
 import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.exception.EntityNotFoundException;
+import ru.mirea.petgo.exception.ValidationException;
 import ru.mirea.petgo.model.User;
 import ru.mirea.petgo.repository.UserRepository;
-
+import ru.mirea.petgo.util.Validators;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -131,17 +132,14 @@ public class UserService {
         if (user == null) {
             throw new BusinessException("Пользователь не может быть null");
         }
-        if (user.getName() == null || user.getName().isBlank()) {
-            throw new BusinessException("Имя пользователя обязательно");
-        }
-        if (user.getEmail() == null || user.getEmail().isBlank()) {
-            throw new BusinessException("Email обязателен");
-        }
-        if (!user.getEmail().contains("@")) {
-            throw new BusinessException("Некорректный email: " + user.getEmail());
-        }
+        user.setName(Validators.requireText("name", "Имя", user.getName(), 100));
+        String email = Validators.requireText("email", "Email", user.getEmail(), 100).toLowerCase();
+        Validators.email("email", email);
+        user.setEmail(email);
+        Validators.optionalPhone("phone", user.getPhone());
+        Validators.optionalText("address", "Адрес", user.getAddress(), 200);
         if (user.getRole() == null) {
-            throw new BusinessException("Роль пользователя обязательна");
+            throw new ValidationException("role", "Выберите роль");
         }
     }
 }

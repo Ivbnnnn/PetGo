@@ -3,12 +3,19 @@ package ru.mirea.petgo.service;
 import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.exception.EntityNotFoundException;
+import ru.mirea.petgo.exception.ValidationException;
 import ru.mirea.petgo.model.WalkHistory;
 import ru.mirea.petgo.model.WalkRequest;
 import ru.mirea.petgo.model.enums.WalkStatus;
 import ru.mirea.petgo.repository.WalkHistoryRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
-
+import ru.mirea.petgo.util.Validators;
+import ru.mirea.petgo.dto.WalkHistoryRow;
+import ru.mirea.petgo.repository.PetRepository;
+import java.math.BigDecimal;
+import ru.mirea.petgo.model.Pet;
+import java.util.stream.Collectors;
+import java.util.Map;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -18,11 +25,13 @@ public class WalkHistoryService {
 
     private final WalkHistoryRepository walkHistoryRepository;
     private final WalkRequestRepository walkRequestRepository;
+    private final PetRepository petRepository;
 
     public WalkHistoryService(WalkHistoryRepository walkHistoryRepository,
-                              WalkRequestRepository walkRequestRepository) {
+            WalkRequestRepository walkRequestRepository, PetRepository petRepository) {
         this.walkHistoryRepository = walkHistoryRepository;
         this.walkRequestRepository = walkRequestRepository;
+        this.petRepository = petRepository;
     }
 
     public WalkHistory create(WalkHistory history) throws BusinessException, DatabaseException {
@@ -38,7 +47,9 @@ public class WalkHistoryService {
             throw new BusinessException("Заявка с id=" + history.getWalkRequestId() + " не найдена");
         }
         if (request.getStatus() != WalkStatus.COMPLETED) {
-            throw new BusinessException("Историю можно создать только для прогулки в статусе COMPLETED. Текущий статус: " + request.getStatus());
+            throw new BusinessException(
+                    "Историю можно создать только для прогулки в статусе COMPLETED. Текущий статус: "
+                            + request.getStatus());
         }
 
         WalkHistory existing;
@@ -193,6 +204,34 @@ public class WalkHistoryService {
         return null;
     }
 
+    public List<WalkHistoryRow> findAllRows() throws DatabaseException {
+        try {
+            Map<Integer, String> pets = petRepository.findAll().stream()
+                    .collect(Collectors.toMap(Pet::getId, Pet::getName));
+            Map<Integer, WalkRequest> requests = walkRequestRepository.findAll().stream()
+                    .collect(Collectors.toMap(WalkRequest::getId, r -> r));
+
+            List<WalkHistoryRow> rows = new ArrayList<>();
+            for (WalkHistory h : walkHistoryRepository.findAll()) {
+                WalkRequest r = requests.get(h.getWalkRequestId());
+                rows.add(new WalkHistoryRow(
+                        h.getId(),
+                        h.getWalkRequestId(),
+                        r == null ? "—" : pets.get(r.getPetId()),
+                        r == null ? null : r.getWalkDateTime(),
+                        h.getActualDuration(),
+                        h.getRoute(),
+                        h.getOwnerReview(),
+                        h.getWalkerReview(),
+                        h.getRating(),
+                        h.getCompletedAt()));
+            }
+            return rows;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка получения истории прогулок", e);
+        }
+    }
+
     private void validateHistory(WalkHistory history) throws BusinessException {
         if (history == null) {
             throw new BusinessException("История не может быть null");
@@ -200,15 +239,15 @@ public class WalkHistoryService {
         if (history.getWalkRequestId() <= 0) {
             throw new BusinessException("Некорректный id заявки");
         }
-        if (history.getActualDuration() != null && history.getActualDuration() < 0) {
-            throw new BusinessException("Длительность не может быть отрицательной");
+        if (history.getActualDuration() != null && history.getActualDuration() <= 0) {
+            throw new ValidationException("actualDuration", "Длительность должна быть больше 0");
         }
         validateRating(history.getRating());
     }
 
     private void validateRating(Integer rating) throws BusinessException {
         if (rating != null && (rating < 1 || rating > 5)) {
-            throw new BusinessException("Рейтинг должен быть от 1 до 5");
+            throw new ValidationException("rating", "Оценка: от 1 до 5");
         }
     }
 }

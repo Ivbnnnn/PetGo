@@ -201,9 +201,9 @@ public class WalkRequestController {
         try {
             walkRequest.setWalkDateTime(LocalDateTime.parse(scanner.nextLine(), formatter));
         } catch (DateTimeParseException e) {
-            System.out.print("Введите корректное время формата dd.MM.yyyy HH:mm");
+            System.out.print("Введите корректное время формата dd.MM.yyyy HH:mm.  ");
         }
-        System.out.print("Введите длительность прогулки в минутах: ");
+        System.out.println("Введите длительность прогулки в минутах: ");
         try {
             walkRequest.setDurationMinutes(Integer.parseInt(scanner.nextLine()));
         } catch (NumberFormatException e) {
@@ -221,7 +221,7 @@ public class WalkRequestController {
         try {
             walkRequest.setPetId(Integer.parseInt(scanner.nextLine()));
         } catch (NumberFormatException e) {
-            System.out.print("Введите корректный ID питомца");
+            System.out.print("Введите корректный ID питомца.  ");
         }
         System.out.print("Введите Id хозяина: ");
         try {

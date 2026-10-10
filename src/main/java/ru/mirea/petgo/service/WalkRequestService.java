@@ -3,6 +3,7 @@ package ru.mirea.petgo.service;
 import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.exception.EntityNotFoundException;
+import ru.mirea.petgo.exception.ValidationException;
 import ru.mirea.petgo.model.Pet;
 import ru.mirea.petgo.model.User;
 import ru.mirea.petgo.model.WalkRequest;
@@ -11,11 +12,17 @@ import ru.mirea.petgo.model.enums.WalkStatus;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
+import ru.mirea.petgo.util.Validators;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import ru.mirea.petgo.dto.WalkRequestRow;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class WalkRequestService {
 
@@ -33,35 +40,14 @@ public class WalkRequestService {
 
     public WalkRequest create(WalkRequest request) throws BusinessException, DatabaseException {
         validateRequest(request);
+        applyOwnerFromPet(request);
+        validateRequestRelations(request, true);
 
-        Pet pet;
-        try {
-            pet = petRepository.findById(request.getPetId());
-        } catch (SQLException e) {
-            throw new DatabaseException("Ошибка поиска питомца", e);
-        }
-        if (pet == null) {
-            throw new BusinessException("Питомец с id=" + request.getPetId() + " не найден");
-        }
-        if (pet.getOwnerId() != request.getOwnerId()) {
-            throw new BusinessException("Питомец не принадлежит этому владельцу");
-        }
-
-        User owner;
-        try {
-            owner = userRepository.findById(request.getOwnerId());
-        } catch (SQLException e) {
-            throw new DatabaseException("Ошибка поиска владельца", e);
-        }
-        if (owner == null) {
-            throw new BusinessException("Владелец с id=" + request.getOwnerId() + " не найден");
-        }
-        if (owner.getRole() != UserRole.OWNER) {
-            throw new BusinessException("Пользователь не является владельцем");
+        if (request.getWalkDateTime().isBefore(LocalDateTime.now())) {
+            throw new ValidationException("walkDateTime", "Нельзя создать заявку на прошедшее время");
         }
 
         request.setStatus(WalkStatus.CREATED);
-        request.setWalkerId(null);
         request.setCreatedAt(LocalDateTime.now());
 
         try {
@@ -113,7 +99,11 @@ public class WalkRequestService {
         if (existing.getStatus() != request.getStatus()) {
             throw new BusinessException("Для изменения статуса используйте startWalk / completeWalk / cancelRequest");
         }
-        validateRequestRelations(request);
+        if (!request.getWalkDateTime().equals(existing.getWalkDateTime())
+                && request.getWalkDateTime().isBefore(LocalDateTime.now()))
+            throw new ValidationException("walkDateTime", "Нельзя перенести заявку на прошедшее время");
+        applyOwnerFromPet(request);
+        validateRequestRelations(request, false);
         try {
             boolean updated = walkRequestRepository.update(request);
             if (!updated) {
@@ -124,45 +114,38 @@ public class WalkRequestService {
         }
     }
 
-    private void validateRequestRelations(WalkRequest request)
-            throws BusinessException, DatabaseException {
-        Pet pet;
-        User owner;
-
+    private void applyOwnerFromPet(WalkRequest request) throws BusinessException, DatabaseException {
         try {
-            pet = petRepository.findById(request.getPetId());
-            owner = userRepository.findById(request.getOwnerId());
+            Pet pet = petRepository.findById(request.getPetId());
+            if (pet == null) {
+                throw new ValidationException("pet", "Питомец не найден");
+            }
+            request.setOwnerId(pet.getOwnerId());
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска питомца", e);
+        }
+    }
+
+    private void validateRequestRelations(WalkRequest request, boolean creating)
+            throws BusinessException, DatabaseException {
+        try {
+            User owner = userRepository.findById(request.getOwnerId());
+            if (owner == null)
+                throw new ValidationException("pet", "Владелец питомца не найден");
+            if (owner.getRole() != UserRole.OWNER)
+                throw new ValidationException("pet", "Владелец питомца не имеет роли «Владелец»");
+            if (creating && !owner.isActive())
+                throw new ValidationException("pet", "Владелец питомца неактивен, создать заявку нельзя");
+
+            if (request.getWalkerId() != null) {
+                User walker = userRepository.findById(request.getWalkerId());
+                if (walker == null)
+                    throw new ValidationException("walker", "Выгульщик не найден");
+                if (walker.getRole() != UserRole.WALKER)
+                    throw new ValidationException("walker", "Выбранный пользователь не является выгульщиком");
+            }
         } catch (SQLException e) {
             throw new DatabaseException("Ошибка проверки связей заявки", e);
-        }
-
-        if (pet == null) {
-            throw new BusinessException("Питомец с id=" + request.getPetId() + " не найден");
-        }
-        if (owner == null) {
-            throw new BusinessException("Владелец с id=" + request.getOwnerId() + " не найден");
-        }
-        if (pet.getOwnerId() != owner.getId()) {
-            throw new BusinessException("Питомец не принадлежит этому владельцу");
-        }
-        if (owner.getRole() != UserRole.OWNER) {
-            throw new BusinessException("Пользователь не является владельцем");
-        }
-
-        if (request.getWalkerId() != null) {
-            User walker;
-            try {
-                walker = userRepository.findById(request.getWalkerId());
-            } catch (SQLException e) {
-                throw new DatabaseException("Ошибка поиска выгульщика", e);
-            }
-
-            if (walker == null) {
-                throw new BusinessException("Выгульщик с id=" + request.getWalkerId() + " не найден");
-            }
-            if (walker.getRole() != UserRole.WALKER) {
-                throw new BusinessException("Пользователь не является выгульщиком");
-            }
         }
     }
 
@@ -342,27 +325,47 @@ public class WalkRequestService {
         }
     }
 
+    public List<WalkRequestRow> findAllRows() throws DatabaseException {
+        try {
+            Map<Integer, String> pets = petRepository.findAll().stream()
+                    .collect(Collectors.toMap(Pet::getId, Pet::getName));
+            Map<Integer, String> users = userRepository.findAll().stream()
+                    .collect(Collectors.toMap(User::getId, User::getName));
+            List<WalkRequestRow> rows = new ArrayList<>();
+            for (WalkRequest r : walkRequestRepository.findAll()) {
+                rows.add(new WalkRequestRow(
+                        r.getId(),
+                        r.getPetId(), pets.get(r.getPetId()),
+                        r.getOwnerId(), users.get(r.getOwnerId()),
+                        r.getWalkerId(),
+                        r.getWalkerId() == null ? null : users.get(r.getWalkerId()),
+                        r.getWalkDateTime(),
+                        r.getDurationMinutes(),
+                        r.getWalkAddress(),
+                        r.getStatus(),
+                        r.getDescription(),
+                        r.getPrice()));
+            }
+            return rows;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка получения списка заявок", e);
+        }
+    }
+
     private void validateRequest(WalkRequest request) throws BusinessException {
         if (request == null) {
             throw new BusinessException("Заявка не может быть null");
         }
         if (request.getPetId() <= 0) {
-            throw new BusinessException("Некорректный id питомца");
+            throw new ValidationException("pet", "Выберите питомца");
         }
-        if (request.getOwnerId() <= 0) {
-            throw new BusinessException("Некорректный id владельца");
+        if (request.getWalkDateTime() == null)
+            throw new ValidationException("walkDateTime", "Укажите дату и время прогулки");
+        if (request.getDurationMinutes() <= 0 || request.getDurationMinutes() > 1440) {
+            throw new ValidationException("duration", "Длительность: от 1 до 1440 минут");
         }
-        if (request.getWalkDateTime() == null) {
-            throw new BusinessException("Дата и время прогулки обязательны");
-        }
-        if (request.getWalkDateTime().isBefore(LocalDateTime.now())) {
-            throw new BusinessException("Нельзя создать заявку на прошедшее время");
-        }
-        if (request.getDurationMinutes() <= 0) {
-            throw new BusinessException("Длительность должна быть положительной");
-        }
-        if (request.getWalkAddress() == null || request.getWalkAddress().isBlank()) {
-            throw new BusinessException("Адрес прогулки обязателен");
-        }
+        Validators.requireText("walkAddress", "Адрес", request.getWalkAddress(), 200);
+        if (request.getPrice() != null)
+            Validators.range("price", "Цена", request.getPrice(), BigDecimal.ZERO, new BigDecimal("99999999.99"));
     }
 }
