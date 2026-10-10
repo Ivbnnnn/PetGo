@@ -5,8 +5,11 @@ import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.exception.ValidationException;
 import ru.mirea.petgo.model.Pet;
+import ru.mirea.petgo.model.User;
+import ru.mirea.petgo.model.enums.UserRole;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
+import ru.mirea.petgo.repository.WalkRequestRepository;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -16,10 +19,13 @@ import ru.mirea.petgo.util.Validators;
 public class PetService {
     private final PetRepository petRepository;
     private final UserRepository userRepository;
+    private final WalkRequestRepository walkRequestRepository;
 
-    public PetService(PetRepository petRepository, UserRepository userRepository) {
+    public PetService(PetRepository petRepository, UserRepository userRepository,
+            WalkRequestRepository walkRequestRepository) {
         this.petRepository = petRepository;
         this.userRepository = userRepository;
+        this.walkRequestRepository = walkRequestRepository;
     }
 
     public Pet createPet(Pet pet) throws BusinessException, DatabaseException {
@@ -53,6 +59,11 @@ public class PetService {
         try {
             if (petRepository.findById(id) == null) {
                 throw new BusinessException("Питомец с id=" + id + " не найден");
+            }
+            int requests = walkRequestRepository.countByOwnerId(id);
+            if (requests > 0) {
+                throw new BusinessException(
+                        "Нельзя удалить питомца: у него есть заявки (" + requests + "). Сначала удалите их.");
             }
             petRepository.deleteById(id);
         } catch (SQLException e) {
@@ -116,16 +127,34 @@ public class PetService {
         }
     }
 
-    private void validate(Pet pet) throws BusinessException {
-        Validators.requireText("name", "Кличка", pet.getName(), 100);
+    private void validate(Pet pet) throws BusinessException, DatabaseException {
+        pet.setName(Validators.requireText("name", "Кличка", pet.getName(), 100));
         Validators.optionalText("breed", "Порода", pet.getBreed(), 100);
         Validators.optionalText("photoUrl", "Фото", pet.getPhotoUrl(), 255);
-        if (pet.getAge() < 0 && pet.getAge() != null) {
+        if (pet.getAge() != null && pet.getAge() < 0) {
             throw new ValidationException("age", "Возраст питомца не может быть отрицательным");
         }
         if (pet.getWeight() != null) {
             Validators.range("weight", "Вес", pet.getWeight(),
                     new BigDecimal("0.01"), new BigDecimal("999.99"));
+        }
+        checkOwner(pet.getOwnerId());
+    }
+
+    private void checkOwner(int ownerId) throws BusinessException, DatabaseException {
+        if (ownerId <= 0) {
+            throw new ValidationException("owner", "Выберите владельца");
+        }
+        try {
+            User owner = userRepository.findById(ownerId);
+            if (owner == null) {
+                throw new ValidationException("owner", "Владелец не найден");
+            }
+            if (owner.getRole() != UserRole.OWNER) {
+                throw new ValidationException("owner", "Выбранный пользователь не является владельцем");
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка проверки владельца", e);
         }
     }
 }

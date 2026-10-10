@@ -160,8 +160,7 @@ public class WalkRequestService {
         }
     }
 
-    public WalkRequest startWalk(int requestId, int walkerId)
-            throws BusinessException, DatabaseException {
+    public WalkRequest startWalk(int requestId, int walkerId) throws BusinessException, DatabaseException {
         WalkRequest request;
         try {
             request = walkRequestRepository.findById(requestId);
@@ -264,6 +263,39 @@ public class WalkRequestService {
             throw new DatabaseException("Ошибка обновления заявки", e);
         }
         return request;
+    }
+
+    public WalkRequest startWalk(int requestId) throws BusinessException, DatabaseException {
+        WalkRequest r = getExisting(requestId);
+        if (r.getWalkerId() == null) {
+            throw new BusinessException("Сначала назначьте выгульщика");
+        }
+        return startWalk(requestId, r.getWalkerId());
+    }
+
+    public WalkRequest completeWalk(int requestId) throws BusinessException, DatabaseException {
+        WalkRequest r = getExisting(requestId);
+        if (r.getWalkerId() == null) {
+            throw new BusinessException("У заявки не назначен выгульщик");
+        }
+        return completeWalk(requestId, r.getWalkerId());
+    }
+
+    public WalkRequest cancelRequest(int requestId) throws BusinessException, DatabaseException {
+        WalkRequest r = getExisting(requestId);
+        return cancelRequest(requestId, r.getOwnerId());
+    }
+
+    private WalkRequest getExisting(int requestId) throws BusinessException, DatabaseException {
+        try {
+            WalkRequest r = walkRequestRepository.findById(requestId);
+            if (r == null) {
+                throw new BusinessException("Заявка с id=" + requestId + " не найдена");
+            }
+            return r;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка поиска заявки", e);
+        }
     }
 
     public List<WalkRequest> findByPetName(String petName)

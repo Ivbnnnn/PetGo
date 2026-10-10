@@ -9,10 +9,8 @@ import ru.mirea.petgo.model.WalkRequest;
 import ru.mirea.petgo.model.enums.WalkStatus;
 import ru.mirea.petgo.repository.WalkHistoryRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
-import ru.mirea.petgo.util.Validators;
 import ru.mirea.petgo.dto.WalkHistoryRow;
 import ru.mirea.petgo.repository.PetRepository;
-import java.math.BigDecimal;
 import ru.mirea.petgo.model.Pet;
 import java.util.stream.Collectors;
 import java.util.Map;
@@ -20,12 +18,16 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import ru.mirea.petgo.dto.WalkRequestOption;
+import java.time.format.DateTimeFormatter;
+import java.util.Set;
 
 public class WalkHistoryService {
 
     private final WalkHistoryRepository walkHistoryRepository;
     private final WalkRequestRepository walkRequestRepository;
     private final PetRepository petRepository;
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     public WalkHistoryService(WalkHistoryRepository walkHistoryRepository,
             WalkRequestRepository walkRequestRepository, PetRepository petRepository) {
@@ -109,6 +111,9 @@ public class WalkHistoryService {
         }
         if (existing == null) {
             throw new BusinessException("История с id=" + history.getId() + " не найдена");
+        }
+        if (existing.getWalkRequestId() != history.getWalkRequestId()) {
+            throw new ValidationException("walkRequest", "Заявку у записи истории менять нельзя");
         }
 
         try {
@@ -232,12 +237,31 @@ public class WalkHistoryService {
         }
     }
 
+    public List<WalkRequestOption> findCompletedWithoutHistory() throws DatabaseException {
+        try {
+            Set<Integer> withHistory = walkHistoryRepository.findAll().stream().map(WalkHistory::getWalkRequestId)
+                    .collect(Collectors.toSet());
+            Map<Integer, String> pets = petRepository.findAll().stream()
+                    .collect(Collectors.toMap(Pet::getId, Pet::getName));
+            List<WalkRequestOption> result = new ArrayList<>();
+            for (WalkRequest r : walkRequestRepository.findAll()) {
+                if (r.getStatus() == WalkStatus.COMPLETED && !withHistory.contains(r.getId())) {
+                    result.add(new WalkRequestOption(r.getId(), "№" + r.getId() + " · " + pets.get(r.getPetId()) + " · "
+                            + r.getWalkDateTime().format(DATE_FMT)));
+                }
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка получения заявок без истории", e);
+        }
+    }
+
     private void validateHistory(WalkHistory history) throws BusinessException {
         if (history == null) {
             throw new BusinessException("История не может быть null");
         }
         if (history.getWalkRequestId() <= 0) {
-            throw new BusinessException("Некорректный id заявки");
+            throw new ValidationException("walkRequest", "Выберите заявку");
         }
         if (history.getActualDuration() != null && history.getActualDuration() <= 0) {
             throw new ValidationException("actualDuration", "Длительность должна быть больше 0");

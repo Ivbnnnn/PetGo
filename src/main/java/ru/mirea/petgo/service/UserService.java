@@ -6,6 +6,8 @@ import ru.mirea.petgo.exception.EntityNotFoundException;
 import ru.mirea.petgo.exception.ValidationException;
 import ru.mirea.petgo.model.User;
 import ru.mirea.petgo.repository.UserRepository;
+import ru.mirea.petgo.repository.WalkRequestRepository;
+import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.util.Validators;
 import java.sql.SQLException;
 import java.util.List;
@@ -13,9 +15,14 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PetRepository petRepository;
+    private final WalkRequestRepository walkRequestRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PetRepository petRepository,
+            WalkRequestRepository walkRequestRepository) {
         this.userRepository = userRepository;
+        this.petRepository = petRepository;
+        this.walkRequestRepository = walkRequestRepository;
     }
 
     public User create(User user) throws BusinessException, DatabaseException {
@@ -79,16 +86,20 @@ public class UserService {
         }
     }
 
-    public void delete(int id) throws EntityNotFoundException, DatabaseException {
+    public void delete(int id) throws EntityNotFoundException, BusinessException, DatabaseException {
         findById(id);
-
         try {
-            boolean deleted = userRepository.deleteById(id);
-            if (!deleted) {
+            int pets = petRepository.countByOwnerId(id);
+            int requests = walkRequestRepository.countByOwnerId(id) + walkRequestRepository.countByWalkerId(id);
+            if (pets > 0 || requests > 0) {
+                throw new BusinessException("Нельзя удалить пользователя: питомцев — " + pets
+                        + ", заявок — " + requests + ". Сначала удалите связанные записи.");
+            }
+            if (!userRepository.deleteById(id)) {
                 throw new EntityNotFoundException("Пользователь с id=" + id + " не найден");
             }
         } catch (SQLException e) {
-            throw new DatabaseException("Ошибка удаления пользователя id=" + id, e);
+            throw new DatabaseException("Не удалось удалить пользователя", e);
         }
     }
 

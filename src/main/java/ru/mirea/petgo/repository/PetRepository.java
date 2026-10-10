@@ -65,7 +65,7 @@ public class PetRepository implements Repository<Pet> {
         String sql = "SELECT * FROM pets ORDER BY id";
 
         try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
+                ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 pets.add(mapRow(resultSet));
             }
@@ -119,14 +119,14 @@ public class PetRepository implements Repository<Pet> {
         return pet;
     }
 
-
     public List<Pet> findByName(String name) throws SQLException {
         String sql = "SELECT * FROM pets WHERE name ILIKE ? ORDER BY name";
         List<Pet> pets = new ArrayList<>();
-        try (PreparedStatement statement = connection.prepareStatement(sql)){
-            statement.setString(1,"%" + name + "%" );
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, "%" + name + "%");
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) pets.add(mapRow(rs));
+                while (rs.next())
+                    pets.add(mapRow(rs));
             }
         }
         return pets;
@@ -138,7 +138,8 @@ public class PetRepository implements Repository<Pet> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, ownerId);
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) pets.add(mapRow(rs));
+                while (rs.next())
+                    pets.add(mapRow(rs));
             }
         }
         return pets;
@@ -150,8 +151,9 @@ public class PetRepository implements Repository<Pet> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, "%" + breed + "%");
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) pets.add(mapRow(rs));
-            }        
+                while (rs.next())
+                    pets.add(mapRow(rs));
+            }
         }
         return pets;
     }
@@ -163,7 +165,8 @@ public class PetRepository implements Repository<Pet> {
             statement.setBigDecimal(1, min);
             statement.setBigDecimal(2, max);
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) pets.add(mapRow(rs));
+                while (rs.next())
+                    pets.add(mapRow(rs));
             }
         }
         return pets;
@@ -176,7 +179,8 @@ public class PetRepository implements Repository<Pet> {
             statement.setInt(1, minAge);
             statement.setInt(2, maxAge);
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) pets.add(mapRow(rs));
+                while (rs.next())
+                    pets.add(mapRow(rs));
             }
         }
         return pets;
@@ -189,25 +193,38 @@ public class PetRepository implements Repository<Pet> {
             statement.setInt(1, ownerId);
             statement.setString(2, "%" + breed + "%");
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) pets.add(mapRow(rs));
+                while (rs.next())
+                    pets.add(mapRow(rs));
             }
-        }   
+        }
         return pets;
     }
 
     public List<Pet> findAllSorted(String sortBy, boolean ascending) throws SQLException {
         Comparator<Pet> comparator = switch (sortBy) {
-            case "name"   -> Comparator.comparing(Pet::getName, String.CASE_INSENSITIVE_ORDER);
-            case "breed"  -> Comparator.comparing(Pet::getBreed, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+            case "name" -> Comparator.comparing(Pet::getName, String.CASE_INSENSITIVE_ORDER);
+            case "breed" -> Comparator.comparing(Pet::getBreed, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
             case "weight" -> Comparator.comparing(Pet::getWeight, Comparator.nullsLast(BigDecimal::compareTo));
-            case "age"    -> Comparator.comparing(Pet::getAge, Comparator.nullsLast(Integer::compareTo));
-            case "id"     -> Comparator.comparingInt(Pet::getId);
+            case "age" -> Comparator.comparing(Pet::getAge, Comparator.nullsLast(Integer::compareTo));
+            case "id" -> Comparator.comparingInt(Pet::getId);
             default -> throw new IllegalArgumentException("Недопустимое поле сортировки: " + sortBy);
         };
-        if (!ascending) comparator = comparator.reversed();
+        if (!ascending)
+            comparator = comparator.reversed();
 
         return findAll().stream()
                 .sorted(comparator)
                 .toList();
+    }
+
+    public int countByOwnerId(int ownerId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM pets WHERE owner_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, ownerId);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 package ru.mirea.petgo.repository;
 
+import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.model.WalkRequest;
 import ru.mirea.petgo.model.enums.WalkStatus;
 
@@ -61,7 +62,7 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         String sql = "SELECT * FROM walk_requests ORDER BY id";
 
         try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
+                ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 requests.add(mapRow(resultSet));
             }
@@ -92,7 +93,6 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         }
     }
 
-
     public List<WalkRequest> findByPetName(String petName) throws SQLException {
         String sql = "SELECT wr.* FROM walk_requests wr "
                 + "JOIN pets p ON wr.pet_id = p.id "
@@ -101,7 +101,8 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, "%" + petName + "%");
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) requests.add(mapRow(rs));
+                while (rs.next())
+                    requests.add(mapRow(rs));
             }
         }
         return requests;
@@ -114,12 +115,12 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setDate(1, java.sql.Date.valueOf(date));
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) requests.add(mapRow(rs));
+                while (rs.next())
+                    requests.add(mapRow(rs));
             }
         }
         return requests;
     }
-
 
     public List<WalkRequest> findByStatus(WalkStatus status) throws SQLException {
         String sql = "SELECT * FROM walk_requests WHERE status = ? ORDER BY walk_datetime";
@@ -127,7 +128,8 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, status.name());
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) requests.add(mapRow(rs));
+                while (rs.next())
+                    requests.add(mapRow(rs));
             }
         }
         return requests;
@@ -139,12 +141,12 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, ownerId);
             try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) requests.add(mapRow(rs));
+                while (rs.next())
+                    requests.add(mapRow(rs));
             }
         }
         return requests;
     }
-
 
     public List<WalkRequest> findAllSorted(String field, boolean asc) throws SQLException {
         String column;
@@ -164,10 +166,33 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
 
         List<WalkRequest> requests = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet rs = statement.executeQuery()) {
-            while (rs.next()) requests.add(mapRow(rs));
+                ResultSet rs = statement.executeQuery()) {
+            while (rs.next())
+                requests.add(mapRow(rs));
         }
         return requests;
+    }
+
+    public int countByPetId(int petId) throws SQLException {
+        return count("SELECT COUNT(*) FROM walk_requests WHERE pet_id = ?", petId);
+    }
+
+    public int countByOwnerId(int ownerId) throws SQLException {
+        return count("SELECT COUNT(*) FROM walk_requests WHERE owner_id = ?", ownerId);
+    }
+
+    public int countByWalkerId(int walkerId) throws SQLException {
+        return count("SELECT COUNT(*) FROM walk_requests WHERE walker_id = ?", walkerId);
+    }
+
+    private int count(String sql, int id) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, id);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
     }
 
     public List<WalkRequest> findAllSortedByPetName(boolean asc) throws SQLException {
@@ -178,12 +203,12 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
 
         List<WalkRequest> requests = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet rs = statement.executeQuery()) {
-            while (rs.next()) requests.add(mapRow(rs));
+                ResultSet rs = statement.executeQuery()) {
+            while (rs.next())
+                requests.add(mapRow(rs));
         }
         return requests;
     }
-
 
     private void setRequestValues(PreparedStatement statement, WalkRequest request) throws SQLException {
         statement.setInt(1, request.getPetId());
