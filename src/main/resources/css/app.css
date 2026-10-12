@@ -1,0 +1,44 @@
+
+.root {
+    -fx-font-family: "Arial";
+    -fx-font-size: 13px;
+}
+
+.form-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 8 0;
+}
+
+.button {
+    -fx-cursor: hand;
+    -fx-padding: 8px 16px;
+}
+
+.primary-button {
+    -fx-background-color: #0d9488;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.primary-button:hover {
+    -fx-background-color: #0f766e;
+}
+
+.text-field,
+.text-area,
+.combo-box,
+.date-picker {
+    -fx-pref-height: 34px;
+}
+
+.error-label {
+    -fx-text-fill: #b91c1c;
+    -fx-font-weight: bold;
+}
+
+.field-error {
+    -fx-border-color: #dc2626;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 4px;
+}

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ru.mirea.petgo.controller.WalkRequestsController"
+            stylesheets="@../css/app.css">
+
+    <top>
+        <VBox spacing="10" styleClass="toolbar">
+            <padding>
+                <Insets top="15" right="15" bottom="15" left="15"/>
+            </padding>
+
+            <Label text="Заявки на выгул"
+                   styleClass="form-title"/>
+
+            <HBox spacing="8">
+                <TextField fx:id="searchField"
+                           promptText="Поиск по питомцу, владельцу, выгульщику, адресу"
+                           HBox.hgrow="ALWAYS"/>
+
+                <ComboBox fx:id="statusFilter"
+                          promptText="Все статусы"
+                          prefWidth="155"/>
+
+                <ComboBox fx:id="walkerFilter"
+                          promptText="Все выгульщики"
+                          prefWidth="170"/>
+            </HBox>
+
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Период:"/>
+
+                <DatePicker fx:id="dateFrom"
+                            promptText="С"
+                            prefWidth="140"/>
+
+                <DatePicker fx:id="dateTo"
+                            promptText="По"
+                            prefWidth="140"/>
+
+                <Label text="Цена:"/>
+
+                <TextField fx:id="priceFrom"
+                           promptText="От"
+                           prefWidth="90"/>
+
+                <TextField fx:id="priceTo"
+                           promptText="До"
+                           prefWidth="90"/>
+
+                <Button text="Применить"
+                        onAction="#handleRefresh"/>
+
+                <Button text="Сбросить"
+                        onAction="#handleResetFilters"/>
+            </HBox>
+
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Сортировка:"/>
+
+                <ComboBox fx:id="sortBox"
+                          prefWidth="160"/>
+
+                <CheckBox fx:id="ascendingBox"
+                          text="По возрастанию"/>
+
+                <Region HBox.hgrow="ALWAYS"/>
+
+                <Button text="Обновить"
+                        onAction="#handleRefresh"/>
+            </HBox>
+
+            <Separator/>
+
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Button text="Добавить"
+                        onAction="#handleAdd"
+                        styleClass="primary-button"/>
+
+                <Button fx:id="editButton"
+                        text="Изменить"
+                        onAction="#handleEdit"/>
+
+                <Button fx:id="deleteButton"
+                        text="Удалить"
+                        onAction="#handleDelete"/>
+
+                <Separator orientation="VERTICAL"/>
+
+                <Button fx:id="startButton"
+                        text="Начать"
+                        onAction="#handleStart"/>
+
+                <Button fx:id="completeButton"
+                        text="Завершить"
+                        onAction="#handleComplete"/>
+
+                <Button fx:id="cancelButton"
+                        text="Отменить"
+                        onAction="#handleCancel"/>
+
+                <Region HBox.hgrow="ALWAYS"/>
+
+                <Button text="Экспорт"
+                        onAction="#handleExport"
+                        styleClass="primary-button"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <TableView fx:id="requestsTable"
+                BorderPane.alignment="CENTER">
+            <columnResizePolicy>
+                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+            </columnResizePolicy>
+            <columns>
+                <TableColumn fx:id="petColumn"
+                             text="Питомец"
+                             prefWidth="100"/>
+
+                <TableColumn fx:id="ownerColumn"
+                             text="Владелец"
+                             prefWidth="120"/>
+
+                <TableColumn fx:id="walkerColumn"
+                             text="Выгульщик"
+                             prefWidth="120"/>
+
+                <TableColumn fx:id="dateColumn"
+                             text="Дата и время"
+                             prefWidth="145"/>
+
+                <TableColumn fx:id="durationColumn"
+                             text="Мин."
+                             prefWidth="65"/>
+
+                <TableColumn fx:id="addressColumn"
+                             text="Адрес"
+                             prefWidth="160"/>
+
+                <TableColumn fx:id="statusColumn"
+                             text="Статус"
+                             prefWidth="110"/>
+
+                <TableColumn fx:id="priceColumn"
+                             text="Цена, ₽"
+                             prefWidth="90"/>
+            </columns>
+        </TableView>
+    </center>
+
+    <bottom>
+        <VBox spacing="8">
+            <padding>
+                <Insets top="10" right="15" bottom="10" left="15"/>
+            </padding>
+
+            <Label text="Информация о выбранной заявке"
+                   styleClass="form-title"/>
+
+            <Label fx:id="detailsLabel"
+                   text="Выберите заявку для просмотра."
+                   wrapText="true"/>
+
+            <Separator/>
+
+            <HBox spacing="8">
+                <Label text="Количество заявок:"/>
+
+                <Label fx:id="countLabel" text="0"/>
+
+                <Region HBox.hgrow="ALWAYS"/>
+
+                <Label fx:id="messageLabel"/>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>

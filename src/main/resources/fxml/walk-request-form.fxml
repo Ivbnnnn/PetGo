@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<ScrollPane
+        xmlns="http://javafx.com/javafx/21"
+        xmlns:fx="http://javafx.com/fxml/1"
+        fx:controller="ru.mirea.petgo.controller.WalkRequestFormController"
+        fitToWidth="true"
+        prefViewportWidth="540"
+        prefViewportHeight="650">
+
+    <content>
+        <VBox spacing="10" prefWidth="500">
+
+            <padding>
+                <Insets top="20" right="22" bottom="20" left="22"/>
+            </padding>
+
+            <Label
+                    fx:id="titleLabel"
+                    text="Заявка на выгул"
+                    styleClass="form-title"/>
+
+            <Label text="Владелец"/>
+            <ComboBox
+                    fx:id="ownerComboBox"
+                    maxWidth="Infinity"
+                    promptText="Выберите владельца"/>
+
+            <Label text="Питомец"/>
+            <ComboBox
+                    fx:id="petComboBox"
+                    maxWidth="Infinity"
+                    promptText="Выберите питомца"/>
+
+            <Label text="Выгульщик"/>
+            <ComboBox
+                    fx:id="walkerComboBox"
+                    maxWidth="Infinity"
+                    promptText="Выберите активного выгульщика"/>
+
+            <GridPane hgap="12" vgap="7">
+
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="50"/>
+                    <ColumnConstraints percentWidth="50"/>
+                </columnConstraints>
+
+                <Label
+                        text="Дата"
+                        GridPane.rowIndex="0"
+                        GridPane.columnIndex="0"/>
+
+                <Label
+                        text="Время (ЧЧ:ММ)"
+                        GridPane.rowIndex="0"
+                        GridPane.columnIndex="1"/>
+
+                <DatePicker
+                        fx:id="datePicker"
+                        maxWidth="Infinity"
+                        GridPane.rowIndex="1"
+                        GridPane.columnIndex="0"/>
+
+                <TextField
+                        fx:id="timeField"
+                        promptText="10:30"
+                        GridPane.rowIndex="1"
+                        GridPane.columnIndex="1"/>
+
+                <Label
+                        text="Длительность, мин."
+                        GridPane.rowIndex="2"
+                        GridPane.columnIndex="0"/>
+
+                <Label
+                        text="Цена, ₽"
+                        GridPane.rowIndex="2"
+                        GridPane.columnIndex="1"/>
+
+                <TextField
+                        fx:id="durationField"
+                        promptText="60"
+                        GridPane.rowIndex="3"
+                        GridPane.columnIndex="0"/>
+
+                <TextField
+                        fx:id="priceField"
+                        promptText="500.00"
+                        GridPane.rowIndex="3"
+                        GridPane.columnIndex="1"/>
+
+            </GridPane>
+
+            <Label text="Адрес прогулки"/>
+            <TextField
+                    fx:id="addressField"
+                    promptText="Улица, дом"/>
+
+            <Label text="Описание"/>
+            <TextArea
+                    fx:id="descriptionArea"
+                    promptText="Особые пожелания"
+                    prefRowCount="3"
+                    wrapText="true"/>
+
+            <Label text="Статус"/>
+            <TextField
+                    fx:id="statusField"
+                    editable="false"
+                    focusTraversable="false"/>
+
+            <Label
+                    fx:id="errorLabel"
+                    wrapText="true"
+                    styleClass="error-label"/>
+
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+
+                <Button
+                        text="Отмена"
+                        onAction="#handleCancel"
+                        cancelButton="true"/>
+
+                <Button
+                        text="Сохранить"
+                        onAction="#handleSave"
+                        defaultButton="true"
+                        styleClass="primary-button"/>
+
+            </HBox>
+
+        </VBox>
+    </content>
+</ScrollPane>

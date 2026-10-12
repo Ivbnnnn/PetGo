@@ -13,6 +13,7 @@ import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
 import ru.mirea.petgo.util.Validators;
+import ru.mirea.petgo.dto.WalkRequestFilter;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -354,6 +355,36 @@ public class WalkRequestService {
             return walkRequestRepository.findAllSortedByPetName(asc);
         } catch (SQLException e) {
             throw new DatabaseException("Ошибка сортировки по имени питомца", e);
+        }
+    }
+
+    public List<WalkRequestRow> search(
+        WalkRequestFilter filter
+    ) throws DatabaseException {
+        if (filter == null) {
+                filter = WalkRequestFilter.empty();
+        }
+
+        if (filter.dateFrom() != null && filter.dateTo() != null && filter.dateFrom().isAfter(filter.dateTo())) {
+                throw new IllegalArgumentException("Начало периода не может быть позже конца.");
+        }
+
+        if (filter.priceFrom() != null && filter.priceFrom().signum() < 0) {
+                throw new IllegalArgumentException("Минимальная цена не может быть отрицательной.");
+        }
+
+        if (filter.priceTo() != null && filter.priceTo().signum() < 0) {
+                throw new IllegalArgumentException("Максимальная цена не может быть отрицательной.");
+        }
+
+        if (filter.priceFrom() != null && filter.priceTo() != null && filter.priceFrom().compareTo(filter.priceTo()) > 0) {
+                throw new IllegalArgumentException("Минимальная цена больше максимальной.");
+        }
+
+        try {
+                return walkRequestRepository.search(filter);
+        } catch (SQLException e) {
+                throw new DatabaseException("Не удалось получить список заявок.", e);
         }
     }
 

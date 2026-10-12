@@ -110,6 +110,7 @@ public class UserController {
         }
     }
 
+    
     private void deleteUser() {
         try {
             System.out.print("Введите ID пользователя для удаления: ");
@@ -120,12 +121,18 @@ public class UserController {
 
         } catch (NumberFormatException e) {
             System.out.println("ID должен быть числом.");
+
         } catch (EntityNotFoundException e) {
             System.out.println(e.getMessage());
+
+        } catch (BusinessException e) {
+            System.out.println(e.getMessage());
+
         } catch (DatabaseException e) {
             System.out.println("Ошибка базы данных: " + e.getMessage());
         }
     }
+
 
     private User readUserData(User user) {
         System.out.print("Введите имя: ");

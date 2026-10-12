@@ -1,6 +1,8 @@
 package ru.mirea.petgo.repository;
 
 import ru.mirea.petgo.exception.DatabaseException;
+import ru.mirea.petgo.dto.WalkRequestFilter;
+import ru.mirea.petgo.dto.WalkRequestRow;
 import ru.mirea.petgo.model.WalkRequest;
 import ru.mirea.petgo.model.enums.WalkStatus;
 
@@ -14,6 +16,7 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class WalkRequestRepository implements Repository<WalkRequest> {
     private final Connection connection;
@@ -172,6 +175,141 @@ public class WalkRequestRepository implements Repository<WalkRequest> {
         }
         return requests;
     }
+
+    
+    public List<WalkRequestRow> search(
+            WalkRequestFilter filter
+    ) throws SQLException {
+
+        Map<String, String> columns = Map.of(
+                "date", "wr.walk_datetime",
+                "duration", "wr.duration_minutes",
+                "price", "wr.price",
+                "status", "wr.status",
+                "pet", "p.name"
+        );
+
+        String sortColumn = columns.getOrDefault(
+                filter.sortBy(), "wr.walk_datetime"
+        );
+
+        StringBuilder sql = new StringBuilder("""
+            SELECT wr.id, wr.pet_id,
+                   p.name AS pet_name,
+                   wr.owner_id,
+                   o.name AS owner_name,
+                   wr.walker_id,
+                   w.name AS walker_name,
+                   wr.walk_datetime,
+                   wr.duration_minutes,
+                   wr.walk_address,
+                   wr.status,
+                   wr.description,
+                   wr.price
+            FROM walk_requests wr
+            JOIN pets p ON p.id = wr.pet_id
+            JOIN users o ON o.id = wr.owner_id
+            LEFT JOIN users w ON w.id = wr.walker_id
+            WHERE 1=1
+            """);
+
+        List<Object> params = new ArrayList<>();
+
+        if (!filter.search().isBlank()) {
+            sql.append("""
+                AND (
+                    p.name ILIKE ?
+                    OR o.name ILIKE ?
+                    OR w.name ILIKE ?
+                    OR wr.walk_address ILIKE ?
+                )
+                """);
+
+            String text = "%" + filter.search() + "%";
+
+            for (int i = 0; i < 4; i++) {
+                params.add(text);
+            }
+        }
+
+        if (filter.status() != null) {
+            sql.append(" AND wr.status = ?");
+            params.add(filter.status().name());
+        }
+
+        if (filter.walkerId() != null) {
+            sql.append(" AND wr.walker_id = ?");
+            params.add(filter.walkerId());
+        }
+
+        if (filter.dateFrom() != null) {
+            sql.append(" AND wr.walk_datetime >= ?");
+            params.add(
+                    Timestamp.valueOf(
+                            filter.dateFrom().atStartOfDay()
+                    )
+            );
+        }
+
+        if (filter.dateTo() != null) {
+            sql.append(" AND wr.walk_datetime < ?");
+            params.add(
+                    Timestamp.valueOf(filter.dateTo().plusDays(1).atStartOfDay())
+            );
+        }
+
+        if (filter.priceFrom() != null) {
+            sql.append(" AND wr.price >= ?");
+            params.add(filter.priceFrom());
+        }
+
+        if (filter.priceTo() != null) {
+            sql.append(" AND wr.price <= ?");
+            params.add(filter.priceTo());
+        }
+
+        sql.append(" ORDER BY ").append(sortColumn).append(filter.ascending() ? " ASC" : " DESC").append(", wr.id ASC");
+
+        List<WalkRequestRow> result = new ArrayList<>();
+
+        try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+
+            for (int i = 0; i < params.size(); i++) {
+                statement.setObject(i + 1, params.get(i));
+            }
+
+            try (ResultSet rs = statement.executeQuery()) {
+
+                while (rs.next()) {
+
+                    Timestamp date =
+                            rs.getTimestamp("walk_datetime");
+
+                    result.add(new WalkRequestRow(
+                        rs.getInt("id"),
+                        rs.getInt("pet_id"),
+                        rs.getString("pet_name"),
+                        rs.getInt("owner_id"),
+                        rs.getString("owner_name"),
+                        (Integer) rs.getObject("walker_id"),
+                        rs.getString("walker_name"),
+                        date == null
+                                ? null
+                                : date.toLocalDateTime(),
+                        rs.getInt("duration_minutes"),
+                        rs.getString("walk_address"),
+                        WalkStatus.valueOf(
+                                rs.getString("status")
+                        ),
+                        rs.getString("description"),
+                        rs.getBigDecimal("price")
+                    ));
+                }
+            }
+        }
+        return result;
+    }
+
 
     public int countByPetId(int petId) throws SQLException {
         return count("SELECT COUNT(*) FROM walk_requests WHERE pet_id = ?", petId);

@@ -38,6 +38,34 @@ public class ExportService {
         return rows.size();
     }
 
+    public int export(
+        List<WalkRequestRow> rows,
+        File file
+    ) throws ExportException {
+        
+        if (rows == null || rows.isEmpty()) {
+            throw new IllegalArgumentException("Нет заявок для экспорта.");
+        }
+
+        if (file == null) {
+            throw new IllegalArgumentException("Файл не выбран.");
+        }
+
+        String name = file.getName().toLowerCase(
+                java.util.Locale.ROOT
+        );
+
+        if (name.endsWith(".csv")) {
+            return exportToCsv(rows, file);
+        }
+
+        if (name.endsWith(".xlsx")) {
+            return exportToExcel(rows, file);
+        }
+
+        throw new IllegalArgumentException("Поддерживаются только CSV и XLSX.");
+    }
+
     private List<String[]> toTable(List<WalkRequestRow> rows) {
         List<String[]> table = new ArrayList<>();
         for (WalkRequestRow r : rows) {
