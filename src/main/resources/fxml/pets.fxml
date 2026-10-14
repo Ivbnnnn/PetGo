@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ru.mirea.petgo.controller.PetController">
+
+    <top>
+        <VBox spacing="10">
+            <padding><Insets top="15" right="15" bottom="15" left="15"/></padding>
+
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Поиск:"/>
+                <TextField fx:id="searchField" promptText="Кличка или порода" prefWidth="200"/>
+                <Label text="Владелец:"/>
+                <ComboBox fx:id="ownerFilter" promptText="Все" prefWidth="200"/>
+                <Button text="Найти" onAction="#handleRefresh"/>
+                <Button text="Сбросить" onAction="#handleReset"/>
+            </HBox>
+
+            <Separator/>
+
+            <HBox spacing="10">
+                <Button text="Добавить" onAction="#handleAdd"/>
+                <Button text="Изменить" onAction="#handleEdit"/>
+                <Button text="Удалить" onAction="#handleDelete"/>
+                <Button text="Обновить" onAction="#handleRefresh"/>
+                <Button text="Экспорт" onAction="#handleExport"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="Всего:"/>
+                <Label fx:id="countLabel" text="0"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <TableView fx:id="petsTable">
+            <columns>
+                <TableColumn fx:id="idColumn" text="ID" prefWidth="50"/>
+                <TableColumn fx:id="nameColumn" text="Кличка" prefWidth="150"/>
+                <TableColumn fx:id="breedColumn" text="Порода" prefWidth="150"/>
+                <TableColumn fx:id="weightColumn" text="Вес" prefWidth="80"/>
+                <TableColumn fx:id="ageColumn" text="Возраст" prefWidth="80"/>
+                <TableColumn fx:id="ownerColumn" text="Владелец" prefWidth="200"/>
+            </columns>
+        </TableView>
+    </center>
+
+    <bottom>
+        <VBox spacing="8">
+            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+            <Label fx:id="messageLabel" textFill="red"/>
+        </VBox>
+    </bottom>
+</BorderPane>

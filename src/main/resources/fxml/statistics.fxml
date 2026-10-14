@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ru.mirea.petgo.controller.StatisticsController"
+            stylesheets="@../css/app.css">
+
+    <top>
+        <VBox spacing="10">
+            <padding><Insets top="15" right="15" bottom="15" left="15"/></padding>
+
+            <Label text="Статистика системы PetGo"
+                   styleClass="form-title"/>
+
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Button text="Обновить"
+                        onAction="#handleRefresh"
+                        styleClass="primary-button"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <ScrollPane fitToWidth="true"
+                    BorderPane.alignment="CENTER">
+            <padding><Insets top="10" right="15" bottom="15" left="15"/></padding>
+
+            <VBox spacing="15">
+
+                <TitledPane text="Пользователи" expanded="true">
+                    <GridPane hgap="20" vgap="8">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+
+                        <Label text="Всего пользователей:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        <Label fx:id="totalUsersLabel" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                        <Label text="Владельцев:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        <Label fx:id="ownersLabel" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                        <Label text="Выгульщиков:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                        <Label fx:id="walkersLabel" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                    </GridPane>
+                </TitledPane>
+
+                <TitledPane text="Питомцы и заявки" expanded="true">
+                    <GridPane hgap="20" vgap="8">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+
+                        <Label text="Всего питомцев:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        <Label fx:id="petsLabel" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                        <Label text="Всего заявок:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        <Label fx:id="requestsLabel" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                        <Label text="Средняя цена:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                        <Label fx:id="avgPriceLabel" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+                        <Label text="Самый активный выгульщик:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                        <Label fx:id="topWalkerLabel" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+                    </GridPane>
+                </TitledPane>
+
+                <TitledPane text="Распределение заявок по статусам" expanded="true">
+                    <VBox fx:id="statusBox" spacing="6">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                    </VBox>
+                </TitledPane>
+
+            </VBox>
+        </ScrollPane>
+    </center>
+
+    <bottom>
+        <VBox spacing="8">
+            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+            <Label fx:id="errorLabel"
+                   styleClass="error-label"/>
+        </VBox>
+    </bottom>
+</BorderPane>

@@ -10,10 +10,13 @@ import ru.mirea.petgo.model.enums.UserRole;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
-
+import ru.mirea.petgo.dto.PetRow;
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import ru.mirea.petgo.util.Validators;
 
 public class PetService {
@@ -127,6 +130,31 @@ public class PetService {
         }
     }
 
+    public List<PetRow> findAllRows() throws DatabaseException {
+        try {
+            List<Pet> pets = petRepository.findAll();
+            List<User> users = userRepository.findAll();
+
+            Map<Integer, String> userNames = users.stream().collect(Collectors.toMap(User::getId, User::getName));
+            List<PetRow> rows = new ArrayList<>();
+            for (Pet p : pets) {
+                rows.add(new PetRow(
+                        p.getId(),
+                        p.getName(),
+                        p.getBreed(),
+                        p.getWeight(),
+                        p.getAge(),
+                        p.getSpecialNeeds(),
+                        p.getPhotoUrl(),
+                        p.getOwnerId(),
+                        userNames.getOrDefault(p.getOwnerId(), "—")));
+            }
+            return rows;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка получения питомцев", e);
+        }
+    }
+
     private void validate(Pet pet) throws BusinessException, DatabaseException {
         pet.setName(Validators.requireText("name", "Кличка", pet.getName(), 100));
         Validators.optionalText("breed", "Порода", pet.getBreed(), 100);
@@ -157,4 +185,5 @@ public class PetService {
             throw new DatabaseException("Ошибка проверки владельца", e);
         }
     }
+
 }
