@@ -1,309 +1,192 @@
 package ru.mirea.petgo.controller;
 
-import java.util.List;
-import java.util.Scanner;
-
-import ru.mirea.petgo.exception.BusinessException;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import ru.mirea.petgo.dto.WalkHistoryRow;
 import ru.mirea.petgo.exception.DatabaseException;
-import ru.mirea.petgo.exception.EntityNotFoundException;
 import ru.mirea.petgo.model.WalkHistory;
+import ru.mirea.petgo.service.PetService;
 import ru.mirea.petgo.service.WalkHistoryService;
+import ru.mirea.petgo.service.WalkRequestService;
+
+import java.net.URL;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 public class WalkHistoryController {
-    private final Scanner scanner;
-    private final WalkHistoryService walkHistoryService;
 
-    public WalkHistoryController(Scanner scanner, WalkHistoryService walkHistoryService) {
-        this.scanner = scanner;
-        this.walkHistoryService = walkHistoryService;
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+
+    @FXML private TableView<WalkHistoryRow> historyTable;
+    @FXML private TableColumn<WalkHistoryRow, Integer> idColumn;
+    @FXML private TableColumn<WalkHistoryRow, Integer> requestIdColumn;
+    @FXML private TableColumn<WalkHistoryRow, String> petColumn;
+    @FXML private TableColumn<WalkHistoryRow, String> walkDateColumn;
+    @FXML private TableColumn<WalkHistoryRow, Integer> durationColumn;
+    @FXML private TableColumn<WalkHistoryRow, String> routeColumn;
+    @FXML private TableColumn<WalkHistoryRow, String> ownerReviewColumn;
+    @FXML private TableColumn<WalkHistoryRow, String> walkerReviewColumn;
+    @FXML private TableColumn<WalkHistoryRow, Integer> ratingColumn;
+    @FXML private TableColumn<WalkHistoryRow, String> completedAtColumn;
+
+    @FXML private ComboBox<Integer> ratingFilter;
+    @FXML private Label countLabel;
+    @FXML private Label messageLabel;
+
+    private WalkHistoryService historyService;
+    private WalkRequestService requestService;
+    private PetService petService;
+
+    @FXML
+    private void initialize() {
+        idColumn.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue().id()));
+        requestIdColumn.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue().walkRequestId()));
+        petColumn.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().petName() == null ? "—" : c.getValue().petName()));
+        walkDateColumn.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().walkDateTime() == null ? "" : c.getValue().walkDateTime().format(DATE_FORMAT)));
+        durationColumn.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue().actualDuration()));
+        routeColumn.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().route() == null ? "—" : c.getValue().route()));
+        ownerReviewColumn.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().ownerReview() == null ? "—" : c.getValue().ownerReview()));
+        walkerReviewColumn.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().walkerReview() == null ? "—" : c.getValue().walkerReview()));
+        ratingColumn.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue().rating()));
+        completedAtColumn.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().completedAt() == null ? "" : c.getValue().completedAt().format(DATE_FORMAT)));
+
+        ratingFilter.getItems().setAll(1, 2, 3, 4, 5);
+        ratingFilter.setOnAction(e -> handleRefresh());
     }
 
-    private void createWalkHistory() {
-        try {
-            WalkHistory history = readHistoryData(new WalkHistory());
-            walkHistoryService.create(history);
-            System.out.println("История прогулки создана.");
-        } catch (BusinessException e) {
-            System.out.println(e.getMessage());
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
+    public void setServices(WalkHistoryService historyService,
+                            WalkRequestService requestService,
+                            PetService petService) {
+        this.historyService = historyService;
+        this.requestService = requestService;
+        this.petService = petService;
+        handleRefresh();
+    }
+
+    @FXML
+    private void handleRefresh() {
+        if (historyService == null) {
+            return;
         }
-    }
+        messageLabel.setText("");
 
-    private void showAllHistories() {
         try {
-            List<WalkHistory> histories = walkHistoryService.findAll();
+            List<WalkHistoryRow> rows = historyService.findAllRows();
 
-            if (histories.isEmpty()) {
-                System.out.println("Истории прогулок нет.");
-                return;
+            Integer minRating = ratingFilter.getValue();
+            if (minRating != null) {
+                List<WalkHistoryRow> filtered = new ArrayList<>();
+                for (WalkHistoryRow r : rows) {
+                    if (r.rating() != null && r.rating() >= minRating) {
+                        filtered.add(r);
+                    }
+                }
+                rows = filtered;
             }
 
-            for (WalkHistory history : histories) {
-                printHistory(history);
+            historyTable.setItems(FXCollections.observableArrayList(rows));
+            countLabel.setText(String.valueOf(rows.size()));
+        } catch (DatabaseException e) {
+            showError("Ошибка загрузки: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleReset() {
+        ratingFilter.setValue(null);
+        handleRefresh();
+    }
+
+    @FXML
+    private void handleAdd() {
+        openForm(null);
+    }
+
+    @FXML
+    private void handleEdit() {
+        WalkHistoryRow row = historyTable.getSelectionModel().getSelectedItem();
+        if (row == null) {
+            return;
+        }
+        try {
+            WalkHistory history = historyService.findById(row.id());
+            openForm(history);
+        } catch (Exception e) {
+            showError("Не удалось открыть запись: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleDelete() {
+        WalkHistoryRow row = historyTable.getSelectionModel().getSelectedItem();
+        if (row == null) {
+            return;
+        }
+
+        if (!confirm("Удалить запись истории №" + row.id() + "?")) {
+            return;
+        }
+
+        try {
+            historyService.delete(row.id());
+            handleRefresh();
+        } catch (Exception e) {
+            showError("Не удалось удалить: " + e.getMessage());
+        }
+    }
+
+    private void openForm(WalkHistory history) {
+        try {
+            URL url = getClass().getResource("/fxml/walk-history-form.fxml");
+            FXMLLoader loader = new FXMLLoader(url);
+            Parent root = loader.load();
+
+            WalkHistoryFormController controller = loader.getController();
+
+            Stage stage = new Stage();
+            stage.setTitle(history == null ? "Новая запись истории" : "Изменить запись истории");
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setScene(new Scene(root));
+            stage.setMinWidth(500);
+            stage.setMinHeight(550);
+
+            controller.setDialogStage(stage);
+            controller.setHistory(history);
+            controller.setServices(historyService);
+
+            stage.showAndWait();
+
+            if (controller.isSaved()) {
+                handleRefresh();
             }
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
+        } catch (Exception e) {
+            showError("Не удалось открыть форму: " + e.getMessage());
         }
     }
 
-    private void printHistory(WalkHistory history) {
-        System.out.println(
-                "ID: " + history.getId()
-                        + ", ID заявки: " + history.getWalkRequestId()
-                        + ", фактическая длительность: " + history.getActualDuration()
-                        + ", маршрут: " + history.getRoute()
-                        + ", отзыв владельца: " + history.getOwnerReview()
-                        + ", отзыв выгульщика: " + history.getWalkerReview()
-                        + ", оценка: " + history.getRating()
-                        + ", завершена: " + history.getCompletedAt()
-        );
+    private boolean confirm(String message) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.YES, ButtonType.NO);
+        return alert.showAndWait().orElse(ButtonType.NO) == ButtonType.YES;
     }
 
-    private WalkHistory readHistoryData(WalkHistory history) {
-        System.out.print("Введите ID заявки: ");
-        try {
-            history.setWalkRequestId(Integer.parseInt(scanner.nextLine()));
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректный ID заявки.");
-        }
-
-        System.out.print("Введите фактическую длительность в минутах: ");
-        try {
-            history.setActualDuration(Integer.parseInt(scanner.nextLine()));
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректную длительность.");
-        }
-
-        System.out.print("Введите маршрут: ");
-        history.setRoute(scanner.nextLine());
-
-        System.out.print("Введите отзыв владельца: ");
-        history.setOwnerReview(scanner.nextLine());
-
-        System.out.print("Введите отзыв выгульщика: ");
-        history.setWalkerReview(scanner.nextLine());
-
-        System.out.print("Введите оценку от 1 до 5: ");
-        try {
-            history.setRating(Integer.parseInt(scanner.nextLine()));
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректную оценку.");
-        }
-
-        return history;
-    }
-
-    private void getHistoryById() {
-        try {
-            System.out.print("Введите ID истории: ");
-            int historyId = Integer.parseInt(scanner.nextLine());
-
-            WalkHistory history = walkHistoryService.findById(historyId);
-            printHistory(history);
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректный ID.");
-        } catch (EntityNotFoundException e) {
-            System.out.println(e.getMessage());
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void updateHistory() {
-        try {
-            System.out.print("Введите ID истории для изменения: ");
-            int historyId = Integer.parseInt(scanner.nextLine());
-
-            WalkHistory history = walkHistoryService.findById(historyId);
-            readHistoryData(history);
-            walkHistoryService.update(history);
-            System.out.println("История прогулки обновлена.");
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректный ID.");
-        } catch (EntityNotFoundException e) {
-            System.out.println(e.getMessage());
-        } catch (BusinessException e) {
-            System.out.println(e.getMessage());
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void deleteHistory() {
-        try {
-            System.out.print("Введите ID истории для удаления: ");
-            int historyId = Integer.parseInt(scanner.nextLine());
-
-            walkHistoryService.delete(historyId);
-            System.out.println("История прогулки удалена.");
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректный ID.");
-        } catch (EntityNotFoundException e) {
-            System.out.println(e.getMessage());
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void addOwnerReview() {
-        try {
-            System.out.print("Введите ID истории: ");
-            int historyId = Integer.parseInt(scanner.nextLine());
-
-            System.out.print("Введите отзыв владельца: ");
-            String review = scanner.nextLine();
-
-            System.out.print("Введите оценку от 1 до 5: ");
-            int rating = Integer.parseInt(scanner.nextLine());
-
-            walkHistoryService.addOwnerReview(historyId, review, rating);
-            System.out.println("Отзыв владельца добавлен.");
-        } catch (NumberFormatException e) {
-            System.out.println("ID и оценка должны быть числами.");
-        } catch (EntityNotFoundException e) {
-            System.out.println(e.getMessage());
-        } catch (BusinessException e) {
-            System.out.println(e.getMessage());
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void addWalkerReview() {
-        try {
-            System.out.print("Введите ID истории: ");
-            int historyId = Integer.parseInt(scanner.nextLine());
-
-            System.out.print("Введите отзыв выгульщика: ");
-            String review = scanner.nextLine();
-
-            walkHistoryService.addWalkerReview(historyId, review);
-            System.out.println("Отзыв выгульщика добавлен.");
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректный ID.");
-        } catch (EntityNotFoundException e) {
-            System.out.println(e.getMessage());
-        } catch (BusinessException e) {
-            System.out.println(e.getMessage());
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void showAverageRating() {
-        try {
-            double average = walkHistoryService.averageRating();
-            System.out.println("Средняя оценка: " + average);
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void findHistoryByRequest() {
-        try {
-            System.out.print("Введите ID заявки: ");
-            int requestId = Integer.parseInt(scanner.nextLine());
-
-            WalkHistory history = walkHistoryService.findByRequest(requestId);
-            if (history == null) {
-                System.out.println("История для этой заявки не найдена.");
-                return;
-            }
-            printHistory(history);
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректный ID заявки.");
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    private void filterByRating() {
-        try {
-            System.out.print("Введите минимальную оценку от 1 до 5: ");
-            int rating = Integer.parseInt(scanner.nextLine());
-
-            if (rating < 1 || rating > 5) {
-                System.out.println("Оценка должна быть от 1 до 5.");
-                return;
-            }
-
-            List<WalkHistory> histories = walkHistoryService.findAllWithRating(rating);
-            if (histories.isEmpty()) {
-                System.out.println("Ничего не найдено.");
-                return;
-            }
-
-            for (WalkHistory history : histories) {
-                printHistory(history);
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Введите корректную оценку.");
-        } catch (DatabaseException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    public void showMenu() {
-        boolean running = true;
-
-        while (running) {
-            System.out.println("""
-                    ========= ИСТОРИЯ ПРОГУЛОК =========
-                    1. Создать историю прогулки
-                    2. Показать все истории прогулок
-                    3. Получить историю по ID
-                    4. Изменить историю
-                    5. Удалить историю
-                    6. Добавить отзыв владельца
-                    7. Добавить отзыв выгульщика
-                    8. Показать среднюю оценку
-                    9. Найти историю по ID заявки
-                    10. Фильтр по минимальной оценке
-                    11. Назад
-                    ====================================
-                    """);
-
-            System.out.print("Выберите действие: ");
-            String choice = scanner.nextLine();
-
-            switch (choice) {
-                case "1":
-                    createWalkHistory();
-                    break;
-                case "2":
-                    showAllHistories();
-                    break;
-                case "3":
-                    getHistoryById();
-                    break;
-                case "4":
-                    updateHistory();
-                    break;
-                case "5":
-                    deleteHistory();
-                    break;
-                case "6":
-                    addOwnerReview();
-                    break;
-                case "7":
-                    addWalkerReview();
-                    break;
-                case "8":
-                    showAverageRating();
-                    break;
-                case "9":
-                    findHistoryByRequest();
-                    break;
-                case "10":
-                    filterByRating();
-                    break;
-                case "11":
-                    running = false;
-                    break;
-                default:
-                    System.out.println("Такого пункта нет.");
-            }
-        }
+    private void showError(String message) {
+        messageLabel.setText(message);
+        new Alert(Alert.AlertType.ERROR, message).showAndWait();
     }
 }

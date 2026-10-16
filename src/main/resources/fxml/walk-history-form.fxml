@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ru.mirea.petgo.controller.WalkHistoryFormController"
+            fitToWidth="true"
+            prefViewportWidth="540"
+            prefViewportHeight="600">
+
+    <content>
+        <VBox spacing="10" prefWidth="500">
+            <padding>
+                <Insets top="20" right="22" bottom="20" left="22"/>
+            </padding>
+
+            <Label fx:id="titleLabel" text="Запись истории" styleClass="form-title"/>
+
+            <Label text="Заявка"/>
+            <ComboBox fx:id="requestComboBox" maxWidth="Infinity" promptText="Выберите заявку"/>
+
+            <Label text="Фактическая длительность, мин."/>
+            <TextField fx:id="durationField" promptText="Например, 45"/>
+
+            <Label text="Маршрут"/>
+            <TextField fx:id="routeField" promptText="Парк, улица, двор..."/>
+
+            <Label text="Отзыв владельца"/>
+            <TextArea fx:id="ownerReviewArea" prefRowCount="3" wrapText="true"
+                      promptText="Как всё прошло?"/>
+
+            <Label text="Отзыв выгульщика"/>
+            <TextArea fx:id="walkerReviewArea" prefRowCount="3" wrapText="true"
+                      promptText="Комментарий выгульщика"/>
+
+            <Label text="Оценка (1–5)"/>
+            <Spinner fx:id="ratingSpinner" editable="true" prefWidth="120"/>
+
+            <Label fx:id="errorLabel" wrapText="true" styleClass="error-label"/>
+
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <Button text="Отмена" onAction="#handleCancel" cancelButton="true"/>
+                <Button text="Сохранить" onAction="#handleSave" defaultButton="true" styleClass="primary-button"/>
+            </HBox>
+        </VBox>
+    </content>
+</ScrollPane>

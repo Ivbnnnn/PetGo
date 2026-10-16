@@ -87,6 +87,19 @@ public class WalkHistoryRepository implements Repository<WalkHistory> {
         }
     }
 
+    public WalkHistory findByRequestId(int walkRequestId) throws SQLException {
+        String sql = "SELECT * FROM walk_history WHERE walk_request_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, walkRequestId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return mapRow(resultSet);
+                }
+            }
+        }
+        return null;
+    }
+
     private void setHistoryValues(PreparedStatement statement, WalkHistory history) throws SQLException {
         statement.setInt(1, history.getWalkRequestId());
         statement.setObject(2, history.getActualDuration());

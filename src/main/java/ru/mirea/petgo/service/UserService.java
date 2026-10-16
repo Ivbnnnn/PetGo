@@ -1,5 +1,6 @@
 package ru.mirea.petgo.service;
 
+import ru.mirea.petgo.dto.UserRow;
 import ru.mirea.petgo.exception.BusinessException;
 import ru.mirea.petgo.exception.DatabaseException;
 import ru.mirea.petgo.exception.EntityNotFoundException;
@@ -10,6 +11,7 @@ import ru.mirea.petgo.repository.WalkRequestRepository;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.util.Validators;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserService {
@@ -136,6 +138,25 @@ public class UserService {
             return userRepository.findByEmail(email);
         } catch (SQLException e) {
             throw new DatabaseException("Ошибка поиска по email", e);
+        }
+    }
+
+    public List<UserRow> findAllRows() throws DatabaseException {
+        try {
+            List<UserRow> rows = new ArrayList<>();
+            for (User u : userRepository.findAll()) {
+                rows.add(new UserRow(
+                        u.getId(),
+                        u.getName(),
+                        u.getEmail(),
+                        u.getPhone(),
+                        u.getRole(),
+                        u.getAddress(),
+                        u.isActive()));
+            }
+            return rows;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка получения списка пользователей", e);
         }
     }
 
