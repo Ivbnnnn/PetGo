@@ -160,7 +160,7 @@ public class PetController {
 
     private void openForm(Pet pet) {
         try {
-            URL url = getClass().getResource("/fxml/pet-form.fxml");
+            URL url = getClass().getResource("/fxml/pets-form.fxml");
             FXMLLoader loader = new FXMLLoader(url);
             Parent root = loader.load();
 
