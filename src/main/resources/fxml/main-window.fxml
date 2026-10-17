@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane 
+            stylesheets="@../css/app.css"
+            fx:id="mainPane"
+            fx:controller="ru.mirea.petgo.controller.MainController"
+            xmlns:fx="http://javafx.com/fxml/1">
+    <left>
+        <VBox spacing="10" prefWidth="190">
+            <padding>
+                <Insets top="16" right="12" bottom="16" left="12"/>
+            </padding>
+            <Button styleClass="primary-button" text="Питомцы" onAction="#showPets" maxWidth="Infinity" prefWidth="40" alignment="CENTER"/>
+            <Button styleClass="primary-button" text="Пользователи" onAction="#showUsers" maxWidth="Infinity" prefWidth="40" alignment="CENTER"/>
+            <Button styleClass="primary-button" text="История" onAction="#showWalkHistory" maxWidth="Infinity" prefWidth="40" alignment="CENTER"/>
+            <Button styleClass="primary-button" text="Заявки" onAction="#showWalkRequests" maxWidth="Infinity" prefWidth="40" alignment="CENTER"/>
+            <Button styleClass="primary-button" text="Статистика" onAction="#showStatistics" maxWidth="Infinity" prefWidth="40" alignment="CENTER"/>
+        </VBox>
+    </left>
+</BorderPane>

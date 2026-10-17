@@ -5,8 +5,8 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import ru.mirea.petgo.controller.MainController;
 
-import ru.mirea.petgo.controller.WalkRequestsController;
 
 import ru.mirea.petgo.repository.*;
 import ru.mirea.petgo.service.*;
@@ -46,13 +46,13 @@ public class Main extends Application {
         ExportService exportService = new ExportService();
 
         FXMLLoader loader = new FXMLLoader(
-                getClass().getResource("/fxml/walk-requests.fxml"));
+                getClass().getResource("/fxml/main-window.fxml"));
 
         Parent root = loader.load();
 
-        WalkRequestsController controller = loader.getController();
+        MainController controller = loader.getController();
 
-        controller.setServices(requestService, petService, userService, exportService);
+        controller.setServices(petService,userService,statisticsService, exportService, walkHistoryService, requestService);
 
         Scene scene = new Scene(root, 1400, 800);
 

@@ -28,7 +28,6 @@
                 <Button text="Изменить" onAction="#handleEdit"/>
                 <Button text="Удалить" onAction="#handleDelete"/>
                 <Button text="Обновить" onAction="#handleRefresh"/>
-                <Button text="Экспорт" onAction="#handleExport"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Label text="Всего:"/>
                 <Label fx:id="countLabel" text="0"/>
