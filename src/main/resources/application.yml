@@ -11,8 +11,17 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

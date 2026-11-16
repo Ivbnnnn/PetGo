@@ -7,6 +7,7 @@ target/
 *.log
 .env
 *.env
+!.env.example
 .DS_Store
 Thumbs.db
 docker-compose.override.yml
