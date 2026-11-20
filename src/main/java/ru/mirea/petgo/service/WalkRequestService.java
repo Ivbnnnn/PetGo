@@ -3,12 +3,15 @@ package ru.mirea.petgo.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.mirea.petgo.domain.*;
 import ru.mirea.petgo.dto.WalkRequestCreateDto;
+import ru.mirea.petgo.dto.WalkRequestFilterDto;
 import ru.mirea.petgo.dto.WalkRequestResponseDto;
 import ru.mirea.petgo.dto.WalkRequestUpdateDto;
+import ru.mirea.petgo.filter.WalkRequestSpecification;
 import ru.mirea.petgo.repository.*;
 import ru.mirea.petgo.util.WalkRequestMapper;
 
@@ -110,5 +113,34 @@ public class WalkRequestService {
         }
         request.setStatus(RequestStatus.CANCELLED);
         return requestMapper.toDto(requestRepository.save(request));
+    }
+
+    @Transactional
+    public void archive(UUID id) {
+        WalkRequest request = requestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        request.setIsArchived(true);
+        requestRepository.save(request);
+    }
+
+    @Transactional
+    public void restore(UUID id) {
+        WalkRequest request = requestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        request.setIsArchived(false);
+        requestRepository.save(request);
+    }
+
+    @Transactional
+    public void permanentDelete(UUID id) {
+        WalkRequest request = requestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        requestRepository.delete(request);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WalkRequestResponseDto> getAll(WalkRequestFilterDto filter, Pageable pageable) {
+        Specification<WalkRequest> spec = WalkRequestSpecification.getFiltered(filter);
+        return requestRepository.findAll(spec, pageable).map(requestMapper::toDto);
     }
 }

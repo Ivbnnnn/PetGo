@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.mirea.petgo.dto.WalkRequestCreateDto;
+import ru.mirea.petgo.dto.WalkRequestFilterDto;
 import ru.mirea.petgo.dto.WalkRequestResponseDto;
 import ru.mirea.petgo.dto.WalkRequestUpdateDto;
 import ru.mirea.petgo.service.WalkRequestService;
@@ -54,5 +55,30 @@ public class WalkRequestController {
     @PostMapping("/{id}/cancel")
     public WalkRequestResponseDto cancel(@PathVariable UUID id) {
         return requestService.cancel(id);
+    }
+
+        @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void archive(@PathVariable UUID id) {
+        requestService.archive(id);
+    }
+
+    @PostMapping("/{id}/restore")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        requestService.restore(id);
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void permanentDelete(@PathVariable UUID id) {
+        requestService.permanentDelete(id);
+    }
+
+    @GetMapping
+    public Page<WalkRequestResponseDto> getAll(
+            @ModelAttribute WalkRequestFilterDto filter,
+            Pageable pageable) {
+        return requestService.getAll(filter, pageable);
     }
 }
