@@ -19,4 +19,6 @@ public interface WalkRequestRepository extends JpaRepository<WalkRequest, UUID>,
     Page<WalkRequest> findAll(Specification<WalkRequest> spec, Pageable pageable);
 
     List<WalkRequest> findByExternalIdIn(Collection<String> externalIds);
+
+    boolean existsByPet_Id(UUID petId);
 }
