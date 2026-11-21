@@ -182,8 +182,12 @@ public class WalkRequestService {
     }
 
     private User findWalker(UUID id) {
-        return userRepository.findById(id)
+        User walker = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Выгульщик не найден"));
+        if (walker.getRole() != UserRole.WALKER || !walker.isEnabled()) {
+            throw new ConflictException("Укажите активного пользователя с ролью WALKER");
+        }
+        return walker;
     }
 
     private void assignDistrict(WalkRequest request, UUID id) {

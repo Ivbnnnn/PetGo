@@ -14,6 +14,7 @@ import ru.mirea.petgo.domain.RequestPriority;
 import ru.mirea.petgo.domain.RequestStatus;
 import ru.mirea.petgo.domain.Tag;
 import ru.mirea.petgo.domain.User;
+import ru.mirea.petgo.domain.UserRole;
 import ru.mirea.petgo.domain.WalkRequest;
 import ru.mirea.petgo.dto.ImportMode;
 import ru.mirea.petgo.dto.ImportReportDto;
@@ -244,8 +245,9 @@ public class CsvImportService {
             walker = lookups.user(walkerEmail);
             if (walker == null) {
                 problems.add("выгульщик с email " + walkerEmail + " не найден");
+            } else if (walker.getRole() != UserRole.WALKER || !walker.isEnabled()) {
+                problems.add("указанный выгульщик должен быть активным пользователем с ролью WALKER");
             }
-            // TODO: когда у User появятся роль и признак активности, проверить, что walker активен и имеет роль WALKER
         }
 
         LocalDateTime scheduledAt = parseDate(clean(rec.get("scheduled_at")), problems);
