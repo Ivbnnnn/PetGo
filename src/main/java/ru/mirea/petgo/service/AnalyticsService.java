@@ -64,7 +64,8 @@ public class AnalyticsService {
                 round(repo.revenueCompleted(f, t)), round(repo.averageRating()),
                 toDto(repo.topPets(f, t, top)),
                 toDto(repo.topOwners(f, t, top)),
-                toDto(repo.topWalkers(f, t, top)));
+                toDto(repo.topWalkers(f, t, top)),
+                toDto(repo.countByDistrict(f, t)));
     }
 
     private static List<NameCountDto> toDto(List<AnalyticsRepository.NameCount> rows) {

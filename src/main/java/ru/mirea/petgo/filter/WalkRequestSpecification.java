@@ -17,6 +17,7 @@ public class WalkRequestSpecification {
     public static Specification<WalkRequest> getFiltered(WalkRequestFilterDto filter) {
         return Specification.allOf(hasStatus(filter.getStatus()), hasPriority(filter.getPriority()),
                 isArchived(prefer(filter.getIsArchived(), filter.getArchived())), hasTag(filter.getTagId()),
+                hasDistrict(filter.getDistrictId()),
                 containsAddress(filter.getAddress()), containsSearch(filter.getSearch()),
                 priceGreaterThan(prefer(filter.getMinPrice(), filter.getPriceFrom())),
                 priceLessThan(prefer(filter.getMaxPrice(), filter.getPriceTo())),
@@ -34,6 +35,10 @@ public class WalkRequestSpecification {
 
     private static Specification<WalkRequest> hasPriority(RequestPriority priority) {
         return (root, query, cb) -> priority == null ? null : cb.equal(root.get("priority"), priority);
+    }
+
+    private static Specification<WalkRequest> hasDistrict(UUID id) {
+        return (root, query, cb) -> id == null ? null : cb.equal(root.get("district").get("id"), id);
     }
 
     public static Specification<WalkRequest> isArchived(Boolean archived) {

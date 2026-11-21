@@ -11,6 +11,7 @@ public class WalkRequestUpdateDto {
     private Long version;
 
     private UUID walkerId;
+    private UUID districtId;
     private LocalDateTime scheduledAt;
     
     @Min(value = 1, message = "Длительность должна быть больше 0")

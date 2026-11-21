@@ -16,6 +16,7 @@ public class WalkRequestFilterDto {
     private Boolean isArchived;
     private Boolean archived;
     private UUID tagId;
+    private UUID districtId;
     private Double minPrice;
     private Double maxPrice;
     private Double priceFrom;

@@ -14,6 +14,7 @@ public class WalkRequestCreateDto {
     private UUID ownerId;
 
     private UUID walkerId;
+    private UUID districtId;
 
     @NotNull(message = "Дата прогулки обязательна")
     private LocalDateTime scheduledAt;

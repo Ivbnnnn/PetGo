@@ -12,6 +12,7 @@ public class WalkRequestResponseDto {
     private UUID petId;
     private UUID ownerId;
     private UUID walkerId;
+    private UUID districtId;
     private LocalDateTime scheduledAt;
     private Integer durationMinutes;
     private String address;

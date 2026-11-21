@@ -20,6 +20,7 @@ public class WalkRequestMapper {
         if (entity.getPet() != null) dto.setPetId(entity.getPet().getId());
         if (entity.getOwner() != null) dto.setOwnerId(entity.getOwner().getId());
         if (entity.getWalker() != null) dto.setWalkerId(entity.getWalker().getId());
+        if (entity.getDistrict() != null) dto.setDistrictId(entity.getDistrict().getId());
 
         dto.setScheduledAt(entity.getScheduledAt());
         dto.setDurationMinutes(entity.getDurationMinutes());

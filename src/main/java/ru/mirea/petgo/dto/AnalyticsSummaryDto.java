@@ -10,5 +10,6 @@ public record AnalyticsSummaryDto(
         Map<String, Long> byStatus, Map<String, Long> byPriority,
         Double avgPrice, Double minPrice, Double maxPrice,
         Double revenueCompleted, Double averageRating,
-        List<NameCountDto> topPets, List<NameCountDto> topOwners, List<NameCountDto> topWalkers) {
+        List<NameCountDto> topPets, List<NameCountDto> topOwners, List<NameCountDto> topWalkers,
+        List<NameCountDto> byDistrict) {
 }

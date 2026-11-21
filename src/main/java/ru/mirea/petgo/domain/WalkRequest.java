@@ -35,6 +35,10 @@ public class WalkRequest {
     @JoinColumn(name = "walker_id")
     private User walker;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "district_id")
+    private District district;
+
     @ManyToMany
     @JoinTable(name = "walk_request_tags",
             joinColumns = @JoinColumn(name = "walk_request_id"),

@@ -83,6 +83,14 @@ public interface AnalyticsRepository extends Repository<WalkRequest, UUID> {
             order by count(r) desc, w.username""")
     List<NameCount> topWalkers(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to, Pageable pageable);
 
+    @Query("""
+            select d.name as name, count(r) as cnt
+            from WalkRequest r join r.district d
+            where r.isArchived = false and r.scheduledAt >= :from and r.scheduledAt < :to
+            group by d.id, d.name
+            order by d.name""")
+    List<NameCount> countByDistrict(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
     /** Нативный запрос: сущности WalkHistory пока нет. После её появления можно заменить на JPQL. */
     @Query(value = "select cast(avg(rating) as double precision) from walk_history", nativeQuery = true)
     Double averageRating();

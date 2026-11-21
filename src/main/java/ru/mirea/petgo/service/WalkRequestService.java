@@ -32,6 +32,7 @@ public class WalkRequestService {
     private final PetRepository petRepository;
     private final UserRepository userRepository;
     private final WalkRequestMapper requestMapper;
+    private final DistrictService districts;
 
     @Transactional
     public WalkRequestResponseDto create(WalkRequestCreateDto dto) {
@@ -47,6 +48,7 @@ public class WalkRequestService {
         request.setExternalId("WR-" + UUID.randomUUID());
         request.setPet(pet);
         request.setOwner(owner);
+        assignDistrict(request, dto.getDistrictId());
         
         if (dto.getWalkerId() != null) {
             request.setWalker(findWalker(dto.getWalkerId()));
@@ -77,6 +79,7 @@ public class WalkRequestService {
         if (!request.getVersion().equals(dto.getVersion())) {
             throw new ConflictException("Заявка уже изменена");
         }
+        assignDistrict(request, dto.getDistrictId());
 
         if (dto.getWalkerId() != null) {
             request.setWalker(findWalker(dto.getWalkerId()));
@@ -162,5 +165,11 @@ public class WalkRequestService {
     private User findWalker(UUID id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Выгульщик не найден"));
+    }
+
+    private void assignDistrict(WalkRequest request, UUID id) {
+        if (id != null && (request.getDistrict() == null || !id.equals(request.getDistrict().getId()))) {
+            request.setDistrict(districts.assignable(id));
+        }
     }
 }
