@@ -11,6 +11,10 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${CSV_IMPORT_MAX_BYTES:2097152}B
+      max-request-size: ${CSV_IMPORT_MAX_REQUEST_SIZE:3MB}
 server:
   error:
     include-message: never
@@ -26,6 +30,8 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 app:
+  csv:
+    import-max-bytes: ${CSV_IMPORT_MAX_BYTES:2097152}
   jwt:
     secret-base64: ${JWT_SECRET_BASE64:}
     issuer: ${JWT_ISSUER:petgo}

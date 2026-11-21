@@ -3,6 +3,7 @@ package ru.mirea.petgo.service;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.csv.DuplicateHeaderMode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +36,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -55,7 +58,8 @@ import java.util.stream.Collectors;
 @Service
 public class CsvImportService {
 
-    private static final DateTimeFormatter SPACE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter SPACE_FORMAT =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(ResolverStyle.STRICT);
     private static final BigDecimal MAX_PRICE = new BigDecimal("99999999.99");
     private static final List<String> REQUIRED = List.of(
             "external_id", "owner_email", "pet_name", "scheduled_at", "duration_minutes", "address", "price");
@@ -110,12 +114,12 @@ public class CsvImportService {
         }
 
         Pet pet(User owner, String name) {
-            return pets.computeIfAbsent(owner.getId() + "|" + name.toLowerCase(),
+            return pets.computeIfAbsent(owner.getId() + "|" + name.toLowerCase(Locale.ROOT),
                     key -> petRepository.findFirstByOwner_IdAndNameIgnoreCase(owner.getId(), name)).orElse(null);
         }
 
         Tag tag(String name) {
-            return tags.computeIfAbsent(name.toLowerCase(),
+            return tags.computeIfAbsent(name.toLowerCase(Locale.ROOT),
                     key -> tagRepository.findByNameIgnoreCase(name)).orElse(null);
         }
     }
@@ -213,7 +217,7 @@ public class CsvImportService {
         }
 
         User owner = null;
-        String ownerEmail = clean(rec.get("owner_email")).toLowerCase();
+        String ownerEmail = clean(rec.get("owner_email")).toLowerCase(Locale.ROOT);
         if (ownerEmail.isEmpty()) {
             problems.add("owner_email: обязательное поле");
         } else {
@@ -235,7 +239,7 @@ public class CsvImportService {
         }
 
         User walker = null;
-        String walkerEmail = optional(rec, "walker_email").toLowerCase();
+        String walkerEmail = optional(rec, "walker_email").toLowerCase(Locale.ROOT);
         if (!walkerEmail.isEmpty()) {
             walker = lookups.user(walkerEmail);
             if (walker == null) {
@@ -347,7 +351,7 @@ public class CsvImportService {
             throw new PayloadTooLargeException("Файл больше " + (maxBytes / 1024) + " КБ");
         }
         String name = file.getOriginalFilename();
-        if (name == null || !name.toLowerCase().endsWith(".csv")) {
+        if (name == null || !name.toLowerCase(Locale.ROOT).endsWith(".csv")) {
             throw new BadRequestException("Нужен файл с расширением .csv");
         }
 
@@ -370,6 +374,7 @@ public class CsvImportService {
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setDelimiter(';')
                 .setHeader()
+                .setDuplicateHeaderMode(DuplicateHeaderMode.DISALLOW)
                 .setSkipHeaderRecord(true)
                 .setIgnoreEmptyLines(true)
                 .setTrim(true)
@@ -390,7 +395,7 @@ public class CsvImportService {
             return list;
         } catch (BadRequestException e) {
             throw e;
-        } catch (IOException | UncheckedIOException | IllegalStateException e) {
+        } catch (IOException | UncheckedIOException | IllegalStateException | IllegalArgumentException e) {
             throw new BadRequestException("Файл не является корректным CSV");
         }
     }
