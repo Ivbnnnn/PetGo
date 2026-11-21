@@ -20,6 +20,11 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-petgo}
       DB_USERNAME: ${POSTGRES_USER:-petgo}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-petgo}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?Set JWT_SECRET_BASE64 in .env}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-PetGo Admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:8080"
     depends_on:

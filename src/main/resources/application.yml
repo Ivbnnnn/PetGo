@@ -25,3 +25,14 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+app:
+  jwt:
+    secret-base64: ${JWT_SECRET_BASE64:}
+    issuer: ${JWT_ISSUER:petgo}
+    access-minutes: ${ACCESS_TOKEN_MINUTES:15}
+    refresh-days: ${REFRESH_TOKEN_DAYS:14}
+  bootstrap:
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    name: ${BOOTSTRAP_ADMIN_NAME:PetGo Admin}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+  cookie-secure: ${COOKIE_SECURE:false}
