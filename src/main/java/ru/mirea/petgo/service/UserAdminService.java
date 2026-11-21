@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.User;
 import ru.mirea.petgo.dto.UserAdminDtos.Create;
 import ru.mirea.petgo.dto.UserAdminDtos.Update;
@@ -28,6 +29,7 @@ public class UserAdminService {
 
     private final UserRepository users;
     private final PasswordEncoder passwords;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public Page<UserDto> list(Pageable page) {
@@ -49,7 +51,9 @@ public class UserAdminService {
         user.setRole(input.role());
         user.setAccessLevel(input.accessLevel());
         setTemporaryPassword(user, input.temporaryPassword());
-        return UserDto.from(users.saveAndFlush(user));
+        users.saveAndFlush(user);
+        audit.record("USER_CREATED", EntityType.USER, user.getId(), "Создана учётная запись");
+        return UserDto.from(user);
     }
 
     @Transactional
@@ -68,20 +72,26 @@ public class UserAdminService {
         user.setAccessLevel(input.accessLevel());
         user.changeEnabled(input.enabled());
         users.flush();
+        audit.record("USER_UPDATED", EntityType.USER, id, "Изменены данные, права или активность учётной записи");
         return UserDto.from(user);
     }
 
     @Transactional
     public UserDto setEnabled(UUID id, boolean enabled) {
         User user = forUpdate(id);
-        user.changeEnabled(enabled);
-        users.flush();
+        if (user.isEnabled() != enabled) {
+            user.changeEnabled(enabled);
+            users.flush();
+            audit.record(enabled ? "USER_UNBLOCKED" : "USER_BLOCKED", EntityType.USER, id,
+                    enabled ? "Учётная запись разблокирована" : "Учётная запись заблокирована");
+        }
         return UserDto.from(user);
     }
 
     @Transactional
     public void resetPassword(UUID id, String temporaryPassword) {
         setTemporaryPassword(forUpdate(id), temporaryPassword);
+        audit.record("PASSWORD_RESET", EntityType.USER, id, "Назначен временный пароль");
     }
 
     private void setTemporaryPassword(User user, String password) {

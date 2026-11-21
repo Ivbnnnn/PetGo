@@ -29,7 +29,8 @@ class BulkServiceTest {
     private final TagRepository tagRepository = mock(TagRepository.class);
     private final WalkRequestService requestService = mock(WalkRequestService.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
-    private final BulkService service = new BulkService(requestRepository, tagRepository, requestService, txManager);
+    private final BulkService service = new BulkService(requestRepository, tagRepository, requestService, txManager,
+            mock(AuditService.class));
 
     @Test
     void archiveReportsResultForEveryRequest() {

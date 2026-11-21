@@ -5,6 +5,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.RefreshSession;
 import ru.mirea.petgo.domain.User;
 import ru.mirea.petgo.dto.AuthDtos.ChangePassword;
@@ -38,17 +39,19 @@ public class AuthService {
     private final RefreshSessionRepository sessions;
     private final PasswordEncoder passwords;
     private final AccessTokens tokens;
+    private final AuditService audit;
     private final Duration accessLifetime;
     private final Duration refreshLifetime;
     private final String dummyHash;
 
     public AuthService(UserRepository users, RefreshSessionRepository sessions, PasswordEncoder passwords,
-                       AccessTokens tokens, @Value("${app.jwt.access-minutes}") long accessMinutes,
+                       AccessTokens tokens, AuditService audit, @Value("${app.jwt.access-minutes}") long accessMinutes,
                        @Value("${app.jwt.refresh-days}") long refreshDays) {
         this.users = users;
         this.sessions = sessions;
         this.passwords = passwords;
         this.tokens = tokens;
+        this.audit = audit;
         if (accessMinutes < 1 || refreshDays < 1) {
             throw new IllegalArgumentException("Сроки действия токенов должны быть положительными");
         }
@@ -66,13 +69,13 @@ public class AuthService {
                 && passwords.matches(input.password(), hash == null ? dummyHash : hash);
         if (user == null || !user.isEnabled() || hash == null
                 || user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
-            throw invalidCredentials();
+            throw loginFailed(user);
         }
         if (!matches) {
             int attempts = user.getLockedUntil() == null ? user.getFailedLoginAttempts() + 1 : 1;
             user.setFailedLoginAttempts(attempts);
             user.setLockedUntil(attempts >= MAX_FAILED_ATTEMPTS ? now.plus(LOCK_TIME) : null);
-            throw invalidCredentials();
+            throw loginFailed(user);
         }
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
@@ -81,6 +84,7 @@ public class AuthService {
         session.setUser(user);
         session.setCredentialVersion(user.getCredentialVersion());
         session.setExpiresAt(now.plus(refreshLifetime));
+        audit.recordAs(user.getId(), "LOGIN_SUCCEEDED", EntityType.USER, user.getId(), "Вход выполнен");
         return issue(session, now);
     }
 
@@ -116,6 +120,7 @@ public class AuthService {
             throw new BadRequestException("Новый пароль должен отличаться от текущего");
         }
         user.replacePassword(passwords.encode(input.newPassword()), false);
+        audit.recordAs(userId, "PASSWORD_CHANGED", EntityType.USER, userId, "Пользователь сменил пароль");
     }
 
     public static String normalizeEmail(String email) {
@@ -152,5 +157,11 @@ public class AuthService {
 
     private BadCredentialsException invalidCredentials() {
         return new BadCredentialsException("Неверные учётные данные или сессия недоступна");
+    }
+
+    private BadCredentialsException loginFailed(User user) {
+        audit.recordAs(null, "LOGIN_FAILED", EntityType.USER, user == null ? null : user.getId(),
+                "Попытка входа отклонена");
+        return invalidCredentials();
     }
 }

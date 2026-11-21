@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.Pet;
 import ru.mirea.petgo.domain.RequestPriority;
 import ru.mirea.petgo.domain.RequestStatus;
@@ -63,6 +64,7 @@ public class CsvImportService {
     private final UserRepository userRepository;
     private final PetRepository petRepository;
     private final TagRepository tagRepository;
+    private final AuditService audit;
 
     @Value("${app.csv.import-max-bytes:2097152}")
     private long maxBytes;
@@ -73,11 +75,13 @@ public class CsvImportService {
     public CsvImportService(WalkRequestRepository requestRepository,
                             UserRepository userRepository,
                             PetRepository petRepository,
-                            TagRepository tagRepository) {
+                            TagRepository tagRepository,
+                            AuditService audit) {
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
         this.petRepository = petRepository;
         this.tagRepository = tagRepository;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -159,8 +163,12 @@ public class CsvImportService {
         }
 
         if (apply) {
-            requestRepository.saveAll(toSave);
-            // TODO: auditService — импорт: режим, создано, обновлено, пропущено, ошибок (без содержимого файла)
+            for (WalkRequest request : requestRepository.saveAll(toSave)) {
+                audit.record("REQUEST_IMPORTED", EntityType.WALK_REQUEST, request.getId(), "Заявка записана при импорте");
+            }
+            audit.record("CSV_IMPORT", EntityType.WALK_REQUEST, null,
+                    "%s: создано %d, обновлено %d, пропущено %d, ошибок %d"
+                            .formatted(mode, toCreate, toUpdate, skipped, errors.size()));
         }
         return new ImportReportDto(records.size(), valid.size(), errors.size(),
                 toCreate, toUpdate, skipped, apply, errors);

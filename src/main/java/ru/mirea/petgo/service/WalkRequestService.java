@@ -8,6 +8,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.mirea.petgo.domain.*;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.dto.WalkRequestCreateDto;
 import ru.mirea.petgo.dto.WalkRequestFilterDto;
 import ru.mirea.petgo.dto.WalkRequestResponseDto;
@@ -33,6 +34,7 @@ public class WalkRequestService {
     private final UserRepository userRepository;
     private final WalkRequestMapper requestMapper;
     private final DistrictService districts;
+    private final AuditService audit;
 
     @Transactional
     public WalkRequestResponseDto create(WalkRequestCreateDto dto) {
@@ -64,7 +66,9 @@ public class WalkRequestService {
         request.setStatus(RequestStatus.CREATED);
         request.setIsArchived(false);
 
-        return requestMapper.toDto(requestRepository.saveAndFlush(request));
+        requestRepository.saveAndFlush(request);
+        audit.record("REQUEST_CREATED", EntityType.WALK_REQUEST, request.getId(), "Создана заявка");
+        return requestMapper.toDto(request);
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +98,9 @@ public class WalkRequestService {
         if (dto.getDescription() != null) request.setDescription(dto.getDescription());
         if (dto.getPrice() != null) request.setPrice(dto.getPrice());
 
-        return requestMapper.toDto(requestRepository.saveAndFlush(request));
+        requestRepository.saveAndFlush(request);
+        audit.record("REQUEST_UPDATED", EntityType.WALK_REQUEST, id, "Изменены данные заявки");
+        return requestMapper.toDto(request);
     }
 
     @Transactional
@@ -103,8 +109,7 @@ public class WalkRequestService {
         if (request.getStatus() != RequestStatus.CREATED) {
             throw new ConflictException("Начать можно только заявку в статусе CREATED");
         }
-        request.setStatus(RequestStatus.IN_PROGRESS);
-        return requestMapper.toDto(requestRepository.saveAndFlush(request));
+        return changeStatus(request, RequestStatus.IN_PROGRESS);
     }
 
     @Transactional
@@ -113,8 +118,7 @@ public class WalkRequestService {
         if (request.getStatus() != RequestStatus.IN_PROGRESS) {
             throw new ConflictException("Завершить можно только заявку в статусе IN_PROGRESS");
         }
-        request.setStatus(RequestStatus.COMPLETED);
-        return requestMapper.toDto(requestRepository.saveAndFlush(request));
+        return changeStatus(request, RequestStatus.COMPLETED);
     }
 
     @Transactional
@@ -123,23 +127,31 @@ public class WalkRequestService {
         if (request.getStatus() == RequestStatus.COMPLETED || request.getStatus() == RequestStatus.CANCELLED) {
             throw new ConflictException("Нельзя отменить завершённую или отменённую заявку");
         }
-        request.setStatus(RequestStatus.CANCELLED);
-        return requestMapper.toDto(requestRepository.saveAndFlush(request));
+        return changeStatus(request, RequestStatus.CANCELLED);
     }
 
     @Transactional
     public void archive(UUID id) {
-        findRequest(id).setIsArchived(true);
+        WalkRequest request = findRequest(id);
+        if (!Boolean.TRUE.equals(request.getIsArchived())) {
+            request.setIsArchived(true);
+            audit.record("REQUEST_ARCHIVED", EntityType.WALK_REQUEST, id, "Заявка архивирована");
+        }
     }
 
     @Transactional
     public void restore(UUID id) {
-        findRequest(id).setIsArchived(false);
+        WalkRequest request = findRequest(id);
+        if (Boolean.TRUE.equals(request.getIsArchived())) {
+            request.setIsArchived(false);
+            audit.record("REQUEST_RESTORED", EntityType.WALK_REQUEST, id, "Заявка восстановлена");
+        }
     }
 
     @Transactional
     public void permanentDelete(UUID id) {
         requestRepository.delete(findRequest(id));
+        audit.record("REQUEST_DELETED", EntityType.WALK_REQUEST, id, "Заявка удалена");
     }
 
     @Transactional(readOnly = true)
@@ -152,6 +164,13 @@ public class WalkRequestService {
     private WalkRequest findRequest(UUID id) {
         return requestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Заявка не найдена"));
+    }
+
+    private WalkRequestResponseDto changeStatus(WalkRequest request, RequestStatus target) {
+        request.setStatus(target);
+        requestRepository.saveAndFlush(request);
+        audit.record("REQUEST_STATUS_CHANGED", EntityType.WALK_REQUEST, request.getId(), "Новый статус: " + target);
+        return requestMapper.toDto(request);
     }
 
     private WalkRequest findActiveRequest(UUID id) {

@@ -3,6 +3,7 @@ package ru.mirea.petgo.service;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.Tag;
 import ru.mirea.petgo.domain.WalkRequest;
 import ru.mirea.petgo.dto.TagCreateDto;
@@ -21,10 +22,12 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final WalkRequestRepository requestRepository;
+    private final AuditService audit;
 
-    public TagService(TagRepository tagRepository, WalkRequestRepository requestRepository) {
+    public TagService(TagRepository tagRepository, WalkRequestRepository requestRepository, AuditService audit) {
         this.tagRepository = tagRepository;
         this.requestRepository = requestRepository;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -41,7 +44,9 @@ public class TagService {
         Tag tag = new Tag();
         tag.setName(name);
         tag.setColor(dto.color());
-        return TagDto.from(tagRepository.save(tag));
+        tagRepository.save(tag);
+        audit.record("TAG_CREATED", EntityType.TAG, tag.getId(), "Создан тег");
+        return TagDto.from(tag);
     }
 
     @Transactional
@@ -54,6 +59,7 @@ public class TagService {
         }
         tag.setName(name);
         tag.setColor(dto.color());
+        audit.record("TAG_UPDATED", EntityType.TAG, id, "Изменён тег");
         return TagDto.from(tag);
     }
 
@@ -64,6 +70,7 @@ public class TagService {
             throw new ResourceNotFoundException("Тег не найден");
         }
         tagRepository.deleteById(id);
+        audit.record("TAG_DELETED", EntityType.TAG, id, "Удалён тег и его привязки к заявкам");
     }
 
     @Transactional
@@ -71,14 +78,18 @@ public class TagService {
         WalkRequest request = findRequest(requestId);
         Tag tag = tagRepository.findById(tagId)
                 .orElseThrow(() -> new ResourceNotFoundException("Тег не найден"));
-        request.getTags().add(tag);          // повторная привязка безопасна
+        if (request.getTags().add(tag)) {
+            audit.record("REQUEST_TAG_ATTACHED", EntityType.WALK_REQUEST, requestId, "Добавлен тег " + tagId);
+        }
         return toDtos(request);
     }
 
     @Transactional
     public List<TagDto> detach(UUID requestId, UUID tagId) {
         WalkRequest request = findRequest(requestId);
-        request.getTags().removeIf(t -> t.getId().equals(tagId));
+        if (request.getTags().removeIf(t -> t.getId().equals(tagId))) {
+            audit.record("REQUEST_TAG_DETACHED", EntityType.WALK_REQUEST, requestId, "Снят тег " + tagId);
+        }
         return toDtos(request);
     }
 

@@ -47,7 +47,8 @@ class CsvImportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CsvImportService(requestRepository, userRepository, petRepository, tagRepository);
+        service = new CsvImportService(requestRepository, userRepository, petRepository, tagRepository,
+                mock(AuditService.class));
         ReflectionTestUtils.setField(service, "maxBytes", 1_000_000L);
         ReflectionTestUtils.setField(service, "maxRows", 100);
 

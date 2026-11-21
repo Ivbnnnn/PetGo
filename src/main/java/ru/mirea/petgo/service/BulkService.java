@@ -6,7 +6,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.RequestStatus;
 import ru.mirea.petgo.domain.WalkRequest;
 import ru.mirea.petgo.dto.BulkAction;
@@ -38,21 +40,25 @@ public class BulkService {
     private final TagRepository tagRepository;
     private final WalkRequestService requestService;
     private final PlatformTransactionManager txManager;
+    private final AuditService audit;
 
     public BulkService(WalkRequestRepository requestRepository,
                        TagRepository tagRepository,
                        WalkRequestService requestService,
-                       PlatformTransactionManager txManager) {
+                       PlatformTransactionManager txManager,
+                       AuditService audit) {
         this.requestRepository = requestRepository;
         this.tagRepository = tagRepository;
         this.requestService = requestService;
         this.txManager = txManager;
+        this.audit = audit;
     }
 
     public BulkResponseDto execute(BulkRequestDto dto) {
         validate(dto);
 
         TransactionTemplate tx = new TransactionTemplate(txManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         List<BulkItemResult> results = new ArrayList<>();
         for (UUID id : new LinkedHashSet<>(dto.ids())) {          // дубли в списке убираем
             try {
@@ -63,8 +69,10 @@ public class BulkService {
             }
         }
         int ok = (int) results.stream().filter(BulkItemResult::success).count();
-        // TODO: auditService — одна запись на операцию: действие, число успешных и ошибочных (без секретов)
-        return new BulkResponseDto(results.size(), ok, results.size() - ok, results);
+        int failed = results.size() - ok;
+        audit.record("BULK_OPERATION", EntityType.WALK_REQUEST, null,
+                "%s: успешно %d, ошибок %d".formatted(dto.action(), ok, failed));
+        return new BulkResponseDto(results.size(), ok, failed, results);
     }
 
     private void validate(BulkRequestDto dto) {
@@ -86,7 +94,7 @@ public class BulkService {
                 .orElseThrow(() -> new ResourceNotFoundException("Заявка не найдена"));
 
         switch (dto.action()) {
-            case ARCHIVE -> {           // TODO: заменить на requestService.archive(id), когда он появится
+            case ARCHIVE -> {
                 if (Boolean.TRUE.equals(request.getIsArchived())) {
                     throw new ConflictException("Заявка уже в архиве");
                 }
@@ -109,6 +117,10 @@ public class BulkService {
                     throw new ConflictException("У заявки нет такого тега");
                 }
             }
+        }
+        if (dto.action() != BulkAction.CHANGE_STATUS) {
+            audit.record("REQUEST_" + dto.action().name(), EntityType.WALK_REQUEST, id,
+                    "Массовая операция: " + dto.action());
         }
     }
 

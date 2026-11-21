@@ -5,32 +5,38 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import ru.mirea.petgo.domain.AccessLevel;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.User;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.security.PasswordPolicy;
 import ru.mirea.petgo.service.AuthService;
+import ru.mirea.petgo.service.AuditService;
 
 @Component
 public class AdminBootstrap implements ApplicationRunner {
     private final UserRepository users;
     private final PasswordEncoder passwords;
+    private final AuditService audit;
     private final String email;
     private final String username;
     private final String password;
 
-    public AdminBootstrap(UserRepository users, PasswordEncoder passwords,
+    public AdminBootstrap(UserRepository users, PasswordEncoder passwords, AuditService audit,
                           @Value("${app.bootstrap.email}") String email,
                           @Value("${app.bootstrap.name}") String username,
                           @Value("${app.bootstrap.password}") String password) {
         this.users = users;
         this.passwords = passwords;
+        this.audit = audit;
         this.email = email;
         this.username = username;
         this.password = password;
     }
 
     @Override
+    @Transactional
     public void run(ApplicationArguments args) {
         if (email.isBlank() && password.isBlank()) {
             return;
@@ -49,5 +55,6 @@ public class AdminBootstrap implements ApplicationRunner {
         admin.setAccessLevel(AccessLevel.ADMIN);
         admin.replacePassword(passwords.encode(password), true);
         users.save(admin);
+        audit.recordAs(null, "USER_BOOTSTRAPPED", EntityType.USER, admin.getId(), "Создан начальный администратор");
     }
 }

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.District;
 import ru.mirea.petgo.dto.DistrictDto;
 import ru.mirea.petgo.error.ConflictException;
@@ -18,6 +19,7 @@ import java.util.UUID;
 public class DistrictService {
     private static final Sort BY_NAME = Sort.by(Sort.Order.asc("name").ignoreCase(), Sort.Order.asc("id"));
     private final DistrictRepository districts;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public List<DistrictDto> list(Boolean enabled) {
@@ -34,7 +36,9 @@ public class DistrictService {
         }
         District district = new District();
         district.setName(cleanName);
-        return DistrictDto.from(districts.save(district));
+        districts.save(district);
+        audit.record("DISTRICT_CREATED", EntityType.DISTRICT, district.getId(), "Создан район выгула");
+        return DistrictDto.from(district);
     }
 
     @Transactional
@@ -45,13 +49,18 @@ public class DistrictService {
             throw duplicateName();
         }
         district.setName(cleanName);
+        audit.record("DISTRICT_UPDATED", EntityType.DISTRICT, id, "Изменено название района");
         return DistrictDto.from(district);
     }
 
     @Transactional
     public DistrictDto setEnabled(UUID id, boolean enabled) {
         District district = find(id);
-        district.setEnabled(enabled);
+        if (district.isEnabled() != enabled) {
+            district.setEnabled(enabled);
+            audit.record(enabled ? "DISTRICT_ENABLED" : "DISTRICT_DISABLED", EntityType.DISTRICT, id,
+                    enabled ? "Район включён" : "Район отключён");
+        }
         return DistrictDto.from(district);
     }
 
