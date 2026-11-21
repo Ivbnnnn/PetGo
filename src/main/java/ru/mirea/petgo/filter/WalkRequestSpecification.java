@@ -2,53 +2,38 @@ package ru.mirea.petgo.filter;
 
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
+import ru.mirea.petgo.domain.RequestPriority;
 import ru.mirea.petgo.domain.RequestStatus;
 import ru.mirea.petgo.domain.Tag;
 import ru.mirea.petgo.domain.WalkRequest;
 import ru.mirea.petgo.dto.WalkRequestFilterDto;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 public class WalkRequestSpecification {
 
     public static Specification<WalkRequest> getFiltered(WalkRequestFilterDto filter) {
-        return (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
+        return Specification.allOf(hasStatus(filter.getStatus()), hasPriority(filter.getPriority()),
+                isArchived(prefer(filter.getIsArchived(), filter.getArchived())), hasTag(filter.getTagId()),
+                containsAddress(filter.getAddress()), containsSearch(filter.getSearch()),
+                priceGreaterThan(prefer(filter.getMinPrice(), filter.getPriceFrom())),
+                priceLessThan(prefer(filter.getMaxPrice(), filter.getPriceTo())),
+                scheduledAfter(prefer(filter.getDateFrom(), filter.getScheduledFrom())),
+                scheduledBefore(prefer(filter.getDateTo(), filter.getScheduledTo())));
+    }
 
-            if (filter.getStatus() != null) {
-                predicates.add(cb.equal(root.get("status"), filter.getStatus()));
-            }
-            if (filter.getIsArchived() != null) {
-                predicates.add(cb.equal(root.get("isArchived"), filter.getIsArchived()));
-            }
-            if (filter.getMinPrice() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("price"), filter.getMinPrice()));
-            }
-            if (filter.getMaxPrice() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("price"), filter.getMaxPrice()));
-            }
-            if (filter.getDateFrom() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("scheduledAt"), filter.getDateFrom()));
-            }
-            if (filter.getDateTo() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("scheduledAt"), filter.getDateTo()));
-            }
-            if (filter.getSearch() != null && !filter.getSearch().isEmpty()) {
-                String searchLike = "%" + filter.getSearch().toLowerCase() + "%";
-                predicates.add(cb.like(cb.lower(root.get("address")), searchLike));
-            }
-
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
+    private static <T> T prefer(T value, T alias) {
+        return value != null ? value : alias;
     }
 
     public static Specification<WalkRequest> hasStatus(RequestStatus status) {
         return (root, query, cb) -> status == null ? null : cb.equal(root.get("status"), status);
+    }
+
+    private static Specification<WalkRequest> hasPriority(RequestPriority priority) {
+        return (root, query, cb) -> priority == null ? null : cb.equal(root.get("priority"), priority);
     }
 
     public static Specification<WalkRequest> isArchived(Boolean archived) {
@@ -72,8 +57,23 @@ public class WalkRequestSpecification {
     }
 
     public static Specification<WalkRequest> containsAddress(String address) {
-        return (root, query, cb) -> address == null || address.isEmpty() ? null
-                : cb.like(cb.lower(root.get("address")), "%" + address.toLowerCase() + "%");
+        return (root, query, cb) -> address == null || address.isBlank() ? null
+                : cb.like(cb.lower(root.get("address")), LikePattern.contains(address), '!');
+    }
+
+    private static Specification<WalkRequest> containsSearch(String search) {
+        return (root, query, cb) -> {
+            if (search == null || search.isBlank()) {
+                return null;
+            }
+            String pattern = LikePattern.contains(search);
+            return cb.or(cb.like(cb.lower(root.get("externalId")), pattern, '!'),
+                    cb.like(cb.lower(root.get("address")), pattern, '!'),
+                    cb.like(cb.lower(root.get("description")), pattern, '!'),
+                    cb.like(cb.lower(root.join("pet", JoinType.LEFT).get("name")), pattern, '!'),
+                    cb.like(cb.lower(root.join("owner", JoinType.LEFT).get("username")), pattern, '!'),
+                    cb.like(cb.lower(root.join("walker", JoinType.LEFT).get("username")), pattern, '!'));
+        };
     }
 
     public static Specification<WalkRequest> hasTag(UUID tagId) {

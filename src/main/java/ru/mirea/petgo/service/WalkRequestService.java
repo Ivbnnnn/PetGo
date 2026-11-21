@@ -3,6 +3,7 @@ package ru.mirea.petgo.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,14 +15,18 @@ import ru.mirea.petgo.dto.WalkRequestUpdateDto;
 import ru.mirea.petgo.error.ConflictException;
 import ru.mirea.petgo.error.ResourceNotFoundException;
 import ru.mirea.petgo.filter.WalkRequestSpecification;
+import ru.mirea.petgo.filter.PageSort;
 import ru.mirea.petgo.repository.*;
 import ru.mirea.petgo.util.WalkRequestMapper;
 
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class WalkRequestService {
+    private static final Set<String> SORT_FIELDS = Set.of("id", "externalId", "scheduledAt", "durationMinutes",
+            "address", "price", "status", "priority", "isArchived", "createdAt", "updatedAt");
 
     private final WalkRequestRepository requestRepository;
     private final PetRepository petRepository;
@@ -137,7 +142,8 @@ public class WalkRequestService {
     @Transactional(readOnly = true)
     public Page<WalkRequestResponseDto> getAll(WalkRequestFilterDto filter, Pageable pageable) {
         Specification<WalkRequest> spec = WalkRequestSpecification.getFiltered(filter);
-        return requestRepository.findAll(spec, pageable).map(requestMapper::toDto);
+        return requestRepository.findAll(spec, PageSort.apply(pageable, Sort.by("scheduledAt"), SORT_FIELDS))
+                .map(requestMapper::toDto);
     }
 
     private WalkRequest findRequest(UUID id) {

@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import ru.mirea.petgo.dto.ImportMode;
 import ru.mirea.petgo.dto.ImportReportDto;
-import ru.mirea.petgo.filter.WalkRequestFilter;
+import ru.mirea.petgo.dto.WalkRequestFilterDto;
+import ru.mirea.petgo.filter.WalkRequestSpecification;
 import ru.mirea.petgo.service.CsvExportService;
 import ru.mirea.petgo.service.CsvImportService;
 
@@ -29,8 +30,8 @@ public class WalkRequestCsvController {
 
     /** Экспорт с теми же параметрами фильтра, что и у списка заявок. */
     @GetMapping("/export")
-    public ResponseEntity<byte[]> export(WalkRequestFilter filter) {
-        byte[] body = exportService.export(filter.toSpecification());
+    public ResponseEntity<byte[]> export(@ModelAttribute WalkRequestFilterDto filter) {
+        byte[] body = exportService.export(WalkRequestSpecification.getFiltered(filter));
         String fileName = "walk-requests-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
