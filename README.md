@@ -1,61 +1,73 @@
 # PetGo v2
 
-Каркас REST API для КР №3: Spring Boot 3.5.16, Java 21, PostgreSQL 17,
-Flyway и Swagger UI. Названия пакетов соответствуют обязательной структуре
-из методички. Функции предметной области пока не реализованы.
+REST API сервиса выгула питомцев для КР №3. Backend использует Java 21, Spring Boot, PostgreSQL 17, Flyway и Spring Security.
 
-## Запуск
+## Запуск через Docker Compose
 
-Для локальной сборки нужны JDK 21 или новее, Maven 3.9 и Docker Compose.
-Создайте `.env` на основе `.env.example` и задайте собственный пароль БД.
+Скопируйте шаблон окружения и сгенерируйте случайный ключ для JWT.
 
 ```powershell
 Copy-Item .env.example .env
+$key = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($key)
+$rng.Dispose()
+[Convert]::ToBase64String($key)
+```
+
+В `.env` укажите результат генерации в `JWT_SECRET_BASE64`, свой пароль в `POSTGRES_PASSWORD` и временный пароль администратора в `BOOTSTRAP_ADMIN_PASSWORD`. Пароли пользователей должны содержать не менее 12 символов и занимать не более 72 байт UTF-8. Начальная учётная запись создаётся при первом запуске, если указаны `BOOTSTRAP_ADMIN_EMAIL` и `BOOTSTRAP_ADMIN_PASSWORD` и такого email ещё нет.
+
+```powershell
 docker compose --env-file .env up --build --wait
 ```
 
-После реализации API: `http://localhost:8080/api`. Swagger UI должен
-открываться по адресу `http://localhost:8080/swagger-ui.html`, OpenAPI JSON —
-по `/v3/api-docs`, health — по `/actuator/health`. Пока собственная
-конфигурация безопасности не написана, Spring Security защищает Swagger и
-остальные HTTP-маршруты стандартными правилами. Доступ к Swagger для
-администратора настроим вместе с JWT и ролями.
+По умолчанию API доступен на `http://localhost:8080/api`, проверка состояния на `/actuator/health`, PostgreSQL на локальном порту `5434`. Swagger UI находится на `/swagger-ui.html` и открывается в браузере после входа с постоянным паролем администратора. Запрос входа должен быть отправлен из того же браузера, чтобы установить cookie Swagger. Для вызова защищённых методов из Swagger укажите JWT через кнопку **Authorize**. OpenAPI JSON на `/v3/api-docs` также доступен администратору.
 
-Для сборки вне контейнера: `mvn clean package`. Чтобы запустить приложение
-локально, сначала поднимите PostgreSQL (`docker compose --env-file .env up -d
-postgres`), затем задайте `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` и выполните
-`mvn spring-boot:run`. Compose передаёт эти параметры автоматически.
+`docker compose down` останавливает сервисы и сохраняет данные в именованном томе. Для запуска приложения из Maven поднимите сервис `postgres` и задайте `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` и переменные JWT и администратора в окружении перед `mvn spring-boot:run`. Для клиента на другом origin задайте список адресов через запятую в `CORS_ALLOWED_ORIGINS`.
 
-## Структура backend
+## Авторизация
 
-Все Java-пакеты находятся в `src/main/java/ru/mirea/petgo/`.
+`OWNER` и `WALKER` определяют, может ли учётная запись выступать владельцем питомца или назначаться выгульщиком. Отдельное поле `accessLevel` определяет права доступа к API.
 
-| Пакет | Что размещать |
+| Уровень | Права |
 | --- | --- |
-| `controller/` | REST-маршруты для пользователей, питомцев, заявок и других функций |
-| `service/` | Бизнес-правила и транзакции |
-| `repository/` | Spring Data JPA и запросы к PostgreSQL |
-| `domain/` | JPA-сущности и enum |
-| `dto/` | Модели запросов и ответов API |
-| `security/` | JWT, роли, текущий пользователь, пароли |
-| `filter/` | Безопасная фильтрация и поиск |
-| `error/` | Единая обработка ошибок |
-| `config/` | Настройки Spring Security, OpenAPI и приложения |
+| `VIEWER` | Просмотр данных и экспорт |
+| `EDITOR` | Права просмотра и изменение питомцев, заявок и тегов, массовые операции, предварительная проверка и применение CSV |
+| `ADMIN` | Права редактора, управление пользователями и справочником, просмотр аудита, Swagger и окончательное удаление заявок |
 
-В каждой папке могут находиться классы разных функций. Например,
-`UserController` — в `controller/`, `UserService` — в `service/`,
-`UserRepository` — в `repository/`. Согласуйте общие DTO и сущности перед
-параллельной разработкой. Пока единственный Java-класс — `PetGoApplication`.
+- `POST /api/auth/login` принимает `email` и `password`, возвращает JWT и refresh-токен. Передавайте JWT в заголовке `Authorization: Bearer <accessToken>`.
+- `GET /api/auth/me` возвращает данные текущей учётной записи.
+- `POST /api/auth/change-password` принимает `currentPassword` и `newPassword`. При временном пароле доступны просмотр своей учётной записи и смена пароля. После смены выполните вход заново.
+- `POST /api/auth/refresh` принимает `refreshToken` и заменяет его новым. `POST /api/auth/logout` с таким же телом отзывает сессию.
 
-Миграции БД размещаются в `src/main/resources/db/migration/` в формате
-`V1__description.sql`. Схема из КР №1 служит основой, но требует адаптации:
-основной сущности нужен UUID и дополнительные поля из требований КР №3.
-Старый `schema.sql` содержит `DROP TABLE`, поэтому его нельзя просто
-скопировать в Flyway. Hibernate настроен на проверку схемы
-(`ddl-auto: validate`); таблицы создают миграции. Тесты размещаются в
-`src/test/java/ru/mirea/petgo/`.
+## Администрирование
 
-## Что ещё предстоит реализовать
+| Маршрут | Назначение |
+| --- | --- |
+| `GET /api/admin/users`, `GET /api/admin/users/{id}` | Список с пагинацией и карточка пользователя |
+| `POST /api/admin/users` | Создание. Поля `username`, `email`, `role`, `accessLevel`, `temporaryPassword` |
+| `PUT /api/admin/users/{id}` | Редактирование. Поля `username`, `email`, `role`, `accessLevel`, `enabled`, `version` |
+| `POST /api/admin/users/{id}/block`, `/unblock` | Блокировка и разблокировка. Блокировка отзывает действующие сессии |
+| `POST /api/admin/users/{id}/reset-password` | Назначение `temporaryPassword` и отзыв действующих сессий |
+| `GET /api/districts?enabled=true` | Список районов. Параметр `enabled` необязательный |
+| `POST /api/districts`, `PUT /api/districts/{id}` | Создание и переименование района. Поле `name` |
+| `POST /api/districts/{id}/enable`, `/disable` | Включение и отключение района |
+| `GET /api/admin/audit` | Журнал аудита с фильтрами `q`, `entityType` и `actorId` |
 
-Миграции, REST API, JWT и роли, аудит, CSV, аналитика и тесты — следующие
-этапы. Frontend в текущий план работ не включён.
+Для постраничных списков используются `page` (начиная с 0), `size` (25 по умолчанию, до 100) и `sort` (например, `occurredAt,desc` для аудита). Аудит хранит действие, автора, тип и UUID объекта, время и краткое описание. `X-Correlation-ID` возвращается в ответе и связывает события одного запроса. Для поиска по журналу его можно передать в `q`.
+
+## Питомцы и заявки
+
+Питомцы доступны через `/api/pets`. Для создания укажите `name` и `ownerId`. Через `/api/walk-requests` можно создать заявку с `petId`, `ownerId`, необязательными `walkerId` и `districtId`, а также `scheduledAt`, `durationMinutes`, `address` и `price`. Отключённый район сохраняется в существующих заявках. Для новых назначений выбирайте включённый район.
+
+Списки и CSV-экспорт принимают одинаковые фильтры, например `search`, `archived`, `status`, `priority`, `districtId`, `tagId`, `priceFrom`, `priceTo`, `scheduledFrom` и `scheduledTo`. Приоритет рассчитывается по длительности. До 30 минут это `LOW`, от 30 до 59 минут `NORMAL`, с 60 минут `HIGH`.
+
+## Сборка и тесты
+
+```powershell
+mvn clean verify
+```
+
+Для проверки запуска Spring и миграций укажите URL выделенной тестовой PostgreSQL в `PETGO_TEST_DB_URL`, при необходимости задайте `PETGO_TEST_DB_USER` и `PETGO_TEST_DB_PASSWORD`. Затем выполните `mvn -Dtest=PostgresSmokeTest test`.
+
+Схемой управляют миграции в `src/main/resources/db/migration`. Hibernate проверяет схему при старте. Код распределён по пакетам `controller`, `service`, `repository`, `domain`, `dto`, `security`, `filter`, `error` и `config` внутри `ru.mirea.petgo`.
