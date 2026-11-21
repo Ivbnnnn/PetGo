@@ -1,5 +1,6 @@
 package ru.mirea.petgo.controller;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,16 +34,19 @@ public class AuthController {
     private boolean cookieSecure;
 
     @PostMapping("/login")
+    @SecurityRequirements
     public Tokens login(@Valid @RequestBody Login input, HttpServletResponse response) {
         return respond(auth.login(input), response);
     }
 
     @PostMapping("/refresh")
+    @SecurityRequirements
     public Tokens refresh(@Valid @RequestBody Refresh input, HttpServletResponse response) {
         return respond(auth.refresh(input.refreshToken()), response);
     }
 
     @PostMapping("/logout")
+    @SecurityRequirements
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@Valid @RequestBody Refresh input, HttpServletResponse response) {
         auth.logout(input.refreshToken());
