@@ -2,5 +2,8 @@
 .idea
 .vscode
 target
+.m2
 *.log
 .env
+.env.*
+*.env
