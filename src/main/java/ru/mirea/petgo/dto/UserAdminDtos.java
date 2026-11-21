@@ -16,6 +16,10 @@ public final class UserAdminDtos {
                          @NotBlank @Email @Size(max = 254) String email,
                          @NotNull UserRole role, @NotNull AccessLevel accessLevel,
                          @NotBlank @Size(max = 128) String temporaryPassword) {
+        @Override
+        public String toString() {
+            return "Create[credentials redacted]";
+        }
     }
 
     public record Update(@NotBlank @Size(max = 160) String username,
@@ -25,5 +29,9 @@ public final class UserAdminDtos {
     }
 
     public record ResetPassword(@NotBlank @Size(max = 128) String temporaryPassword) {
+        @Override
+        public String toString() {
+            return "ResetPassword[credentials redacted]";
+        }
     }
 }
