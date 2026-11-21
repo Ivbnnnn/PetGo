@@ -31,14 +31,13 @@ public class Tag {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    // сравнение по id; getId() (а не поле) нужен, чтобы equals работал и с Hibernate-прокси
     @Override
     public boolean equals(Object o) {
-        return o instanceof Tag other && id != null && id.equals(other.getId());
+        return this == o || o instanceof Tag other && getId() != null && getId().equals(other.getId());
     }
 
     @Override
     public int hashCode() {
-        return getClass().hashCode();
+        return Tag.class.hashCode();
     }
 }

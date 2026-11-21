@@ -1,14 +1,18 @@
 package ru.mirea.petgo.domain;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "walk_requests")
 public class WalkRequest {
@@ -29,6 +33,12 @@ public class WalkRequest {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "walker_id")
     private User walker;
+
+    @ManyToMany
+    @JoinTable(name = "walk_request_tags",
+            joinColumns = @JoinColumn(name = "walk_request_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    private Set<Tag> tags = new HashSet<>();
 
     private LocalDateTime scheduledAt;
     private Integer durationMinutes;
