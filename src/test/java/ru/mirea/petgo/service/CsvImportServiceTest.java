@@ -144,4 +144,19 @@ class CsvImportServiceTest {
                 "external_id;owner_email\nEXT-1;owner@mail.ru".getBytes(StandardCharsets.UTF_8));
         assertThrows(BadRequestException.class, () -> service.preview(file, ImportMode.ONLY_NEW));
     }
+
+    @Test
+    void duplicateHeaderIsRejected() {
+        byte[] content = (HEADER + ";price\n" + VALID_ROW + ";123").getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile file = new MockMultipartFile("file", "import.csv", "text/csv", content);
+        assertThrows(BadRequestException.class, () -> service.preview(file, ImportMode.ONLY_NEW));
+    }
+
+    @Test
+    void impossibleDateIsReportedAsInvalid() {
+        ImportReportDto report = service.preview(csv(VALID_ROW.replace("2026-10-15", "2026-02-30")),
+                ImportMode.ONLY_NEW);
+        assertEquals(1, report.errorRows());
+        assertEquals(0, report.toCreate());
+    }
 }
