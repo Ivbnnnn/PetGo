@@ -11,6 +11,8 @@ import ru.mirea.petgo.dto.WalkRequestCreateDto;
 import ru.mirea.petgo.dto.WalkRequestFilterDto;
 import ru.mirea.petgo.dto.WalkRequestResponseDto;
 import ru.mirea.petgo.dto.WalkRequestUpdateDto;
+import ru.mirea.petgo.error.ConflictException;
+import ru.mirea.petgo.error.ResourceNotFoundException;
 import ru.mirea.petgo.filter.WalkRequestSpecification;
 import ru.mirea.petgo.repository.*;
 import ru.mirea.petgo.util.WalkRequestMapper;
@@ -28,8 +30,13 @@ public class WalkRequestService {
 
     @Transactional
     public WalkRequestResponseDto create(WalkRequestCreateDto dto) {
-        Pet pet = petRepository.findById(dto.getPetId()).orElseThrow(() -> new RuntimeException("Питомец не найден"));
-        User owner = userRepository.findById(dto.getOwnerId()).orElseThrow(() -> new RuntimeException("Владелец не найден"));
+        Pet pet = petRepository.findById(dto.getPetId())
+                .orElseThrow(() -> new ResourceNotFoundException("Питомец не найден"));
+        User owner = userRepository.findById(dto.getOwnerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Владелец не найден"));
+        if (!owner.getId().equals(pet.getOwner().getId())) {
+            throw new ConflictException("Питомец принадлежит другому владельцу");
+        }
         
         WalkRequest request = new WalkRequest();
         request.setExternalId("WR-" + UUID.randomUUID());
@@ -37,8 +44,7 @@ public class WalkRequestService {
         request.setOwner(owner);
         
         if (dto.getWalkerId() != null) {
-            User walker = userRepository.findById(dto.getWalkerId()).orElseThrow(() -> new RuntimeException("Выгульщик не найден"));
-            request.setWalker(walker);
+            request.setWalker(findWalker(dto.getWalkerId()));
         }
 
         request.setScheduledAt(dto.getScheduledAt());
@@ -51,31 +57,24 @@ public class WalkRequestService {
         request.setStatus(RequestStatus.CREATED);
         request.setIsArchived(false);
 
-        return requestMapper.toDto(requestRepository.save(request));
-    }
-
-    @Transactional(readOnly = true)
-    public Page<WalkRequestResponseDto> getAll(Pageable pageable) {
-        return requestRepository.findAll(pageable).map(requestMapper::toDto);
+        return requestMapper.toDto(requestRepository.saveAndFlush(request));
     }
 
     @Transactional(readOnly = true)
     public WalkRequestResponseDto getById(UUID id) {
-        WalkRequest request = requestRepository.findById(id).orElseThrow(() -> new RuntimeException("Заявка не найдена"));
-        return requestMapper.toDto(request);
+        return requestMapper.toDto(findRequest(id));
     }
 
     @Transactional
     public WalkRequestResponseDto update(UUID id, WalkRequestUpdateDto dto) {
-        WalkRequest request = requestRepository.findById(id).orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        WalkRequest request = findRequest(id);
 
         if (!request.getVersion().equals(dto.getVersion())) {
-            throw new RuntimeException("CONFLICT");
+            throw new ConflictException("Заявка уже изменена");
         }
 
         if (dto.getWalkerId() != null) {
-            User walker = userRepository.findById(dto.getWalkerId()).orElseThrow(() -> new RuntimeException("Выгульщик не найден"));
-            request.setWalker(walker);
+            request.setWalker(findWalker(dto.getWalkerId()));
         }
         
         if (dto.getScheduledAt() != null) request.setScheduledAt(dto.getScheduledAt());
@@ -87,65 +86,75 @@ public class WalkRequestService {
         if (dto.getDescription() != null) request.setDescription(dto.getDescription());
         if (dto.getPrice() != null) request.setPrice(dto.getPrice());
 
-        return requestMapper.toDto(requestRepository.save(request));
+        return requestMapper.toDto(requestRepository.saveAndFlush(request));
     }
 
     @Transactional
     public WalkRequestResponseDto start(UUID id) {
-        WalkRequest request = requestRepository.findById(id).orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        WalkRequest request = findActiveRequest(id);
         if (request.getStatus() != RequestStatus.CREATED) {
-            throw new RuntimeException("Начать можно только заявку в статусе CREATED");
+            throw new ConflictException("Начать можно только заявку в статусе CREATED");
         }
         request.setStatus(RequestStatus.IN_PROGRESS);
-        return requestMapper.toDto(requestRepository.save(request));
+        return requestMapper.toDto(requestRepository.saveAndFlush(request));
     }
 
     @Transactional
     public WalkRequestResponseDto complete(UUID id) {
-        WalkRequest request = requestRepository.findById(id).orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        WalkRequest request = findActiveRequest(id);
         if (request.getStatus() != RequestStatus.IN_PROGRESS) {
-            throw new RuntimeException("Завершить можно только заявку в статусе IN_PROGRESS");
+            throw new ConflictException("Завершить можно только заявку в статусе IN_PROGRESS");
         }
         request.setStatus(RequestStatus.COMPLETED);
-        return requestMapper.toDto(requestRepository.save(request));
+        return requestMapper.toDto(requestRepository.saveAndFlush(request));
     }
 
     @Transactional
     public WalkRequestResponseDto cancel(UUID id) {
-        WalkRequest request = requestRepository.findById(id).orElseThrow(() -> new RuntimeException("Заявка не найдена"));
+        WalkRequest request = findActiveRequest(id);
         if (request.getStatus() == RequestStatus.COMPLETED || request.getStatus() == RequestStatus.CANCELLED) {
-            throw new RuntimeException("Нельзя отменить завершенную или отмененную заявку");
+            throw new ConflictException("Нельзя отменить завершённую или отменённую заявку");
         }
         request.setStatus(RequestStatus.CANCELLED);
-        return requestMapper.toDto(requestRepository.save(request));
+        return requestMapper.toDto(requestRepository.saveAndFlush(request));
     }
 
     @Transactional
     public void archive(UUID id) {
-        WalkRequest request = requestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
-        request.setIsArchived(true);
-        requestRepository.save(request);
+        findRequest(id).setIsArchived(true);
     }
 
     @Transactional
     public void restore(UUID id) {
-        WalkRequest request = requestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
-        request.setIsArchived(false);
-        requestRepository.save(request);
+        findRequest(id).setIsArchived(false);
     }
 
     @Transactional
     public void permanentDelete(UUID id) {
-        WalkRequest request = requestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Заявка не найдена"));
-        requestRepository.delete(request);
+        requestRepository.delete(findRequest(id));
     }
 
     @Transactional(readOnly = true)
     public Page<WalkRequestResponseDto> getAll(WalkRequestFilterDto filter, Pageable pageable) {
         Specification<WalkRequest> spec = WalkRequestSpecification.getFiltered(filter);
         return requestRepository.findAll(spec, pageable).map(requestMapper::toDto);
+    }
+
+    private WalkRequest findRequest(UUID id) {
+        return requestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Заявка не найдена"));
+    }
+
+    private WalkRequest findActiveRequest(UUID id) {
+        WalkRequest request = findRequest(id);
+        if (Boolean.TRUE.equals(request.getIsArchived())) {
+            throw new ConflictException("Заявка в архиве");
+        }
+        return request;
+    }
+
+    private User findWalker(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Выгульщик не найден"));
     }
 }
