@@ -21,11 +21,6 @@ public class WalkRequestController {
 
     private final WalkRequestService requestService;
 
-    @GetMapping
-    public Page<WalkRequestResponseDto> getAll(Pageable pageable) {
-        return requestService.getAll(pageable);
-    }
-
     @GetMapping("/{id}")
     public WalkRequestResponseDto getById(@PathVariable UUID id) {
         return requestService.getById(id);
@@ -57,7 +52,7 @@ public class WalkRequestController {
         return requestService.cancel(id);
     }
 
-        @DeleteMapping("/{id}")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         requestService.archive(id);
