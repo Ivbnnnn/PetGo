@@ -1,21 +1,20 @@
 package ru.mirea.petgo.error;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
 
-/**
- * Минимальный обработчик для исключений этой части работы.
- * Если в проекте уже есть свой @RestControllerAdvice, не добавляйте этот файл:
- * перенесите в существующий класс только соответствующие методы.
- */
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
@@ -46,6 +45,17 @@ public class ApiExceptionHandler {
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return build(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+            ServletRequestBindingException.class})
+    public ResponseEntity<ApiError> malformedRequest(Exception e) {
+        return build(HttpStatus.BAD_REQUEST, "Неверный формат тела или параметров запроса");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> staleVersion(OptimisticLockingFailureException e) {
+        return build(HttpStatus.CONFLICT, "Запись уже изменена другим пользователем");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
