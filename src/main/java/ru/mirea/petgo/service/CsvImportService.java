@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import ru.mirea.petgo.domain.Pet;
+import ru.mirea.petgo.domain.RequestPriority;
 import ru.mirea.petgo.domain.RequestStatus;
 import ru.mirea.petgo.domain.Tag;
 import ru.mirea.petgo.domain.User;
@@ -172,6 +173,7 @@ public class CsvImportService {
         request.setWalker(row.walker());
         request.setScheduledAt(row.scheduledAt());
         request.setDurationMinutes(row.duration());
+        request.setPriority(RequestPriority.forDuration(row.duration()));
         request.setAddress(row.address());
         request.setPrice(row.price().doubleValue());
         request.setDescription(row.description());
@@ -182,7 +184,6 @@ public class CsvImportService {
         if (created) {
             request.setStatus(RequestStatus.CREATED);
             request.setIsArchived(false);
-            // TODO: рассчитать priority тем же методом, что и при создании через API
         }
         return request;
     }

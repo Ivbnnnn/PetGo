@@ -20,7 +20,8 @@ public class WalkRequest {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private String externalId; // Код заявки
+    @Column(nullable = false, length = 50)
+    private String externalId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pet_id", nullable = false)
@@ -53,7 +54,8 @@ public class WalkRequest {
     private RequestStatus status;
 
     @Enumerated(EnumType.STRING)
-    private RequestPriority priority; // Вычисляемое поле
+    @Column(nullable = false, length = 20)
+    private RequestPriority priority;
 
     private Boolean isArchived = false;
 

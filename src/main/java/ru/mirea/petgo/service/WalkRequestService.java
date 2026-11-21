@@ -32,6 +32,7 @@ public class WalkRequestService {
         User owner = userRepository.findById(dto.getOwnerId()).orElseThrow(() -> new RuntimeException("Владелец не найден"));
         
         WalkRequest request = new WalkRequest();
+        request.setExternalId("WR-" + UUID.randomUUID());
         request.setPet(pet);
         request.setOwner(owner);
         
@@ -42,6 +43,7 @@ public class WalkRequestService {
 
         request.setScheduledAt(dto.getScheduledAt());
         request.setDurationMinutes(dto.getDurationMinutes());
+        request.setPriority(RequestPriority.forDuration(dto.getDurationMinutes()));
         request.setAddress(dto.getAddress());
         request.setDescription(dto.getDescription());
         request.setPrice(dto.getPrice());
@@ -77,7 +79,10 @@ public class WalkRequestService {
         }
         
         if (dto.getScheduledAt() != null) request.setScheduledAt(dto.getScheduledAt());
-        if (dto.getDurationMinutes() != null) request.setDurationMinutes(dto.getDurationMinutes());
+        if (dto.getDurationMinutes() != null) {
+            request.setDurationMinutes(dto.getDurationMinutes());
+            request.setPriority(RequestPriority.forDuration(dto.getDurationMinutes()));
+        }
         if (dto.getAddress() != null) request.setAddress(dto.getAddress());
         if (dto.getDescription() != null) request.setDescription(dto.getDescription());
         if (dto.getPrice() != null) request.setPrice(dto.getPrice());
