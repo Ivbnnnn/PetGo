@@ -1,5 +1,7 @@
 package ru.mirea.petgo.error;
 
-public class ResourceNotFoundException {
-    
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
 }
