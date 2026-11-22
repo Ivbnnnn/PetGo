@@ -48,19 +48,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Импорт заявок из CSV в два этапа.
- * preview: разбор и проверка без записи в БД (транзакция только для чтения).
- * apply: файл разбирается заново, корректные строки сохраняются, ошибочные пропускаются и описываются в отчёте.
- *
- * Статус и приоритет из файла не импортируются: статус меняется только по правилам переходов,
- * приоритет рассчитывается сервисом заявок.
- */
 @Service
 public class CsvImportService {
 
-    private static final DateTimeFormatter SPACE_FORMAT =
-            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(ResolverStyle.STRICT);
+    private static final DateTimeFormatter SPACE_FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+            .withResolverStyle(ResolverStyle.STRICT);
     private static final BigDecimal MAX_PRICE = new BigDecimal("99999999.99");
     private static final List<String> REQUIRED = List.of(
             "external_id", "owner_email", "pet_name", "scheduled_at", "duration_minutes", "address", "price");
@@ -78,10 +70,10 @@ public class CsvImportService {
     private int maxRows;
 
     public CsvImportService(WalkRequestRepository requestRepository,
-                            UserRepository userRepository,
-                            PetRepository petRepository,
-                            TagRepository tagRepository,
-                            AuditService audit) {
+            UserRepository userRepository,
+            PetRepository petRepository,
+            TagRepository tagRepository,
+            AuditService audit) {
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
         this.petRepository = petRepository;
@@ -100,10 +92,9 @@ public class CsvImportService {
     }
 
     private record ParsedRow(String externalId, User owner, Pet pet, User walker, LocalDateTime scheduledAt,
-                             int duration, String address, BigDecimal price, String description, Set<Tag> tags) {
+            int duration, String address, BigDecimal price, String description, Set<Tag> tags) {
     }
 
-    /** Кэши поиска на время одного импорта: не делаем запрос на каждую строку файла. */
     private class Lookups {
         final Map<String, Optional<User>> users = new HashMap<>();
         final Map<String, Optional<Pet>> pets = new HashMap<>();
@@ -132,7 +123,7 @@ public class CsvImportService {
         List<ParsedRow> valid = new ArrayList<>();
 
         for (CSVRecord rec : records) {
-            long line = rec.getRecordNumber() + 1;                  // +1: строка заголовка
+            long line = rec.getRecordNumber() + 1; // +1: строка заголовка
             List<String> problems = new ArrayList<>();
             ParsedRow row = parse(rec, line, lookups, problems);
             if (problems.isEmpty()) {
@@ -169,7 +160,8 @@ public class CsvImportService {
 
         if (apply) {
             for (WalkRequest request : requestRepository.saveAll(toSave)) {
-                audit.record("REQUEST_IMPORTED", EntityType.WALK_REQUEST, request.getId(), "Заявка записана при импорте");
+                audit.record("REQUEST_IMPORTED", EntityType.WALK_REQUEST, request.getId(),
+                        "Заявка записана при импорте");
             }
             audit.record("CSV_IMPORT", EntityType.WALK_REQUEST, null,
                     "%s: создано %d, обновлено %d, пропущено %d, ошибок %d"
@@ -190,7 +182,7 @@ public class CsvImportService {
         request.setAddress(row.address());
         request.setPrice(row.price().doubleValue());
         request.setDescription(row.description());
-        if (row.tags() != null) {                       // пустая колонка tags: теги не трогаем
+        if (row.tags() != null) { // пустая колонка tags: теги не трогаем
             request.getTags().clear();
             request.getTags().addAll(row.tags());
         }
@@ -314,10 +306,10 @@ public class CsvImportService {
         }
         LocalDateTime result;
         try {
-            result = LocalDateTime.parse(value);                         // 2026-10-15T10:00
+            result = LocalDateTime.parse(value); // 2026-10-15T10:00
         } catch (DateTimeParseException first) {
             try {
-                result = LocalDateTime.parse(value, SPACE_FORMAT);       // 2026-10-15 10:00
+                result = LocalDateTime.parse(value, SPACE_FORMAT); // 2026-10-15 10:00
             } catch (DateTimeParseException second) {
                 problems.add("scheduled_at: формат 2026-10-15 10:00");
                 return null;
@@ -333,7 +325,10 @@ public class CsvImportService {
         return rec.isSet(column) ? clean(rec.get(column)) : "";
     }
 
-    /** Убирает пробелы и апостроф, который экспорт ставит перед = + - @ для защиты от формул. */
+    /**
+     * Убирает пробелы и апостроф, который экспорт ставит перед = + - @ для защиты
+     * от формул.
+     */
     private static String clean(String value) {
         if (value == null) {
             return "";

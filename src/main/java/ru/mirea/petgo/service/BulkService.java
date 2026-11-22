@@ -26,11 +26,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Массовые операции. Каждая заявка обрабатывается в своей транзакции,
- * поэтому ошибка одной заявки не откатывает остальные и описывается в отчёте.
- * Сам метод execute намеренно НЕ помечен @Transactional.
- */
 @Service
 public class BulkService {
 
@@ -43,10 +38,10 @@ public class BulkService {
     private final AuditService audit;
 
     public BulkService(WalkRequestRepository requestRepository,
-                       TagRepository tagRepository,
-                       WalkRequestService requestService,
-                       PlatformTransactionManager txManager,
-                       AuditService audit) {
+            TagRepository tagRepository,
+            WalkRequestService requestService,
+            PlatformTransactionManager txManager,
+            AuditService audit) {
         this.requestRepository = requestRepository;
         this.tagRepository = tagRepository;
         this.requestService = requestService;
@@ -60,7 +55,7 @@ public class BulkService {
         TransactionTemplate tx = new TransactionTemplate(txManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         List<BulkItemResult> results = new ArrayList<>();
-        for (UUID id : new LinkedHashSet<>(dto.ids())) {          // дубли в списке убираем
+        for (UUID id : new LinkedHashSet<>(dto.ids())) { // дубли в списке убираем
             try {
                 tx.executeWithoutResult(status -> applyOne(id, dto));
                 results.add(new BulkItemResult(id, true, null));
@@ -124,7 +119,6 @@ public class BulkService {
         }
     }
 
-    /** Правила переходов живут только в WalkRequestService, здесь они не дублируются. */
     private void changeStatus(WalkRequest request, RequestStatus target) {
         if (Boolean.TRUE.equals(request.getIsArchived())) {
             throw new ConflictException("Заявка в архиве");
@@ -140,7 +134,7 @@ public class BulkService {
     private String message(Exception e) {
         if (e instanceof DataAccessException || e instanceof PersistenceException || e.getMessage() == null) {
             log.warn("Ошибка массовой операции", e);
-            return "Не удалось выполнить операцию";          // подробности SQL клиенту не отдаём
+            return "Не удалось выполнить операцию"; // подробности SQL клиенту не отдаём
         }
         return e.getMessage();
     }

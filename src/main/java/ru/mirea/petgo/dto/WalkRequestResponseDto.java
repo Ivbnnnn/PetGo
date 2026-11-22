@@ -25,4 +25,6 @@ public class WalkRequestResponseDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<TagDto> tags;
+    private String ownerName;
+    private String walkerName;
 }

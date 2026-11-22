@@ -1,3 +1,4 @@
+
 package ru.mirea.petgo.service;
 
 import lombok.RequiredArgsConstructor;
@@ -30,501 +31,605 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WalkRequestService {
 
-    private static final Set<String> SORT_FIELDS = Set.of(
-            "id", "externalId", "scheduledAt",
-            "durationMinutes", "address", "price",
-            "status", "priority", "isArchived",
-            "createdAt", "updatedAt"
-    );
+        private static final Set<String> SORT_FIELDS = Set.of(
+                        "id",
+                        "externalId",
+                        "scheduledAt",
+                        "durationMinutes",
+                        "address",
+                        "price",
+                        "status",
+                        "priority",
+                        "isArchived",
+                        "createdAt",
+                        "updatedAt");
 
-    private final WalkRequestRepository requestRepository;
-    private final PetRepository petRepository;
-    private final UserRepository userRepository;
-    private final WalkRequestMapper requestMapper;
-    private final DistrictService districts;
-    private final AuditService audit;
-    private final WalkHistoryService historyService;
+        private final WalkRequestRepository requestRepository;
+        private final PetRepository petRepository;
+        private final UserRepository userRepository;
+        private final WalkRequestMapper requestMapper;
+        private final DistrictService districts;
+        private final AuditService audit;
+        private final WalkHistoryService historyService;
 
+        @Value("${app.requests.permanent-delete-enabled:false}")
+        private boolean permanentDeleteEnabled;
 
-    @Value("${app.requests.permanent-delete-enabled:false}")
-    private boolean permanentDeleteEnabled;
+        @Transactional
+        public WalkRequestResponseDto create(WalkRequestCreateDto dto) {
 
-    @Transactional
-    public WalkRequestResponseDto create(WalkRequestCreateDto dto) {
+                Pet pet = petRepository.findById(dto.getPetId())
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Питомец не найден"));
 
-        Pet pet = petRepository.findById(dto.getPetId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Питомец не найден"
-                        ));
+                User owner = userRepository.findById(dto.getOwnerId())
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Владелец не найден"));
 
-        User owner = userRepository.findById(dto.getOwnerId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Владелец не найден"
-                        ));
+                if (owner.getRole() != UserRole.OWNER ||
+                                !owner.isEnabled()) {
+                        throw new ConflictException(
+                                        "Создавать заявки может только активный владелец");
+                }
 
-        if (owner.getRole() != UserRole.OWNER ||
-                !owner.isEnabled()) {
-            throw new ConflictException(
-                    "Создавать заявки может только активный владелец"
-            );
+                if (!owner.getId().equals(pet.getOwner().getId())) {
+                        throw new ConflictException(
+                                        "Питомец принадлежит другому владельцу");
+                }
+
+                requireCanManageRequest(owner.getId());
+
+                validateDate(dto.getScheduledAt(), true);
+
+                validateValues(
+                                dto.getDurationMinutes(),
+                                dto.getPrice(),
+                                dto.getAddress());
+
+                WalkRequest request = new WalkRequest();
+
+                request.setExternalId(
+                                "WR-" + UUID.randomUUID());
+
+                request.setPet(pet);
+                request.setOwner(owner);
+
+                if (dto.getWalkerId() != null) {
+                        request.setWalker(findWalker(dto.getWalkerId()));
+                }
+
+                assignDistrict(request, dto.getDistrictId());
+
+                request.setScheduledAt(dto.getScheduledAt());
+                request.setDurationMinutes(dto.getDurationMinutes());
+
+                request.setPriority(
+                                RequestPriority.forDuration(
+                                                dto.getDurationMinutes()));
+
+                request.setAddress(dto.getAddress().strip());
+                request.setDescription(dto.getDescription());
+                request.setPrice(dto.getPrice());
+                request.setStatus(RequestStatus.CREATED);
+                request.setIsArchived(false);
+
+                requestRepository.saveAndFlush(request);
+
+                audit.record(
+                                "REQUEST_CREATED",
+                                EntityType.WALK_REQUEST,
+                                request.getId(),
+                                "Создана заявка");
+
+                return requestMapper.toDto(request);
         }
 
-        if (!owner.getId().equals(pet.getOwner().getId())) {
-            throw new ConflictException(
-                    "Питомец принадлежит другому владельцу"
-            );
+        @Transactional(readOnly = true)
+        public WalkRequestResponseDto getById(UUID id) {
+
+                WalkRequest request = findRequest(id);
+
+                requireRequestReadAccess(request);
+
+                return requestMapper.toDto(request);
         }
 
-        requireOwnerOrAdmin(owner.getId());
+        @Transactional(readOnly = true)
+        public Page<WalkRequestResponseDto> getAll(
+                        WalkRequestFilterDto filter,
+                        Pageable pageable) {
 
-        validateDate(dto.getScheduledAt(), true);
-        validateValues(
-                dto.getDurationMinutes(),
-                dto.getPrice(),
-                dto.getAddress()
-        );
+                Specification<WalkRequest> spec = WalkRequestSpecification.getFiltered(filter);
 
-        WalkRequest request = new WalkRequest();
+                spec = applyUserScope(spec);
 
-        request.setExternalId(
-                "WR-" + UUID.randomUUID()
-        );
+                Pageable safePage = PageSort.apply(
+                                pageable,
+                                Sort.by(
+                                                Sort.Direction.DESC,
+                                                "scheduledAt"),
+                                SORT_FIELDS);
 
-        request.setPet(pet);
-        request.setOwner(owner);
-
-        if (dto.getWalkerId() != null) {
-            request.setWalker(
-                    findWalker(dto.getWalkerId())
-            );
+                return requestRepository.findAll(spec, safePage)
+                                .map(requestMapper::toDto);
         }
 
-        assignDistrict(request, dto.getDistrictId());
+        @Transactional
+        public WalkRequestResponseDto update(
+                        UUID id,
+                        WalkRequestUpdateDto dto) {
 
-        request.setScheduledAt(dto.getScheduledAt());
-        request.setDurationMinutes(dto.getDurationMinutes());
-        request.setPriority(
-                RequestPriority.forDuration(dto.getDurationMinutes())
-        );
-        request.setAddress(dto.getAddress().strip());
-        request.setDescription(dto.getDescription());
-        request.setPrice(dto.getPrice());
-        request.setStatus(RequestStatus.CREATED);
-        request.setIsArchived(false);
+                WalkRequest request = findActiveRequest(id);
 
-        requestRepository.saveAndFlush(request);
+                requireCanManageRequest(
+                                request.getOwner().getId());
 
-        audit.record(
-                "REQUEST_CREATED",
-                EntityType.WALK_REQUEST,
-                request.getId(),
-                "Создана заявка"
-        );
+                if (request.getStatus() == RequestStatus.COMPLETED ||
+                                request.getStatus() == RequestStatus.CANCELLED) {
 
-        return requestMapper.toDto(request);
-    }
+                        throw new ConflictException(
+                                        "Завершённую или отменённую заявку нельзя изменять");
+                }
 
-    @Transactional(readOnly = true)
-    public WalkRequestResponseDto getById(UUID id) {
-        return requestMapper.toDto(findRequest(id));
-    }
+                if (!request.getVersion().equals(dto.getVersion())) {
+                        throw new ConflictException(
+                                        "Заявка уже была изменена другим пользователем");
+                }
 
-    @Transactional(readOnly = true)
-    public Page<WalkRequestResponseDto> getAll(
-            WalkRequestFilterDto filter,
-            Pageable pageable
-    ) {
-        Specification<WalkRequest> spec =
-                WalkRequestSpecification.getFiltered(filter);
+                if (dto.getWalkerId() != null) {
+                        request.setWalker(
+                                        findWalker(dto.getWalkerId()));
+                }
 
-        Pageable safePage = PageSort.apply(
-                pageable,
-                Sort.by(Sort.Direction.DESC, "scheduledAt"),
-                SORT_FIELDS
-        );
+                if (dto.getDistrictId() != null) {
+                        assignDistrict(
+                                        request,
+                                        dto.getDistrictId());
+                }
 
-        return requestRepository.findAll(spec, safePage)
-                .map(requestMapper::toDto);
-    }
+                if (dto.getScheduledAt() != null) {
+                        validateDate(
+                                        dto.getScheduledAt(),
+                                        true);
 
-    @Transactional
-    public WalkRequestResponseDto update(
-            UUID id,
-            WalkRequestUpdateDto dto
-    ) {
-        WalkRequest request = findActiveRequest(id);
+                        request.setScheduledAt(
+                                        dto.getScheduledAt());
+                }
 
-        requireOwnerOrAdmin(request.getOwner().getId());
+                if (dto.getDurationMinutes() != null) {
+                        request.setDurationMinutes(
+                                        dto.getDurationMinutes());
 
-        if (request.getStatus() == RequestStatus.COMPLETED ||
-                request.getStatus() == RequestStatus.CANCELLED) {
-            throw new ConflictException(
-                    "Завершённую или отменённую заявку нельзя изменять"
-            );
+                        request.setPriority(
+                                        RequestPriority.forDuration(
+                                                        dto.getDurationMinutes()));
+                }
+
+                if (dto.getAddress() != null) {
+                        request.setAddress(
+                                        dto.getAddress().strip());
+                }
+
+                if (dto.getDescription() != null) {
+                        request.setDescription(
+                                        dto.getDescription());
+                }
+
+                if (dto.getPrice() != null) {
+                        request.setPrice(
+                                        dto.getPrice());
+                }
+
+                validateValues(
+                                request.getDurationMinutes(),
+                                request.getPrice(),
+                                request.getAddress());
+
+                requestRepository.saveAndFlush(request);
+
+                audit.record(
+                                "REQUEST_UPDATED",
+                                EntityType.WALK_REQUEST,
+                                id,
+                                "Заявка изменена");
+
+                return requestMapper.toDto(request);
         }
 
-        if (!request.getVersion().equals(dto.getVersion())) {
-            throw new ConflictException(
-                    "Заявка уже была изменена другим пользователем"
-            );
+        @Transactional
+        public WalkRequestResponseDto start(UUID id) {
+
+                WalkRequest request = findActiveRequest(id);
+
+                if (request.getStatus() != RequestStatus.CREATED) {
+                        throw new ConflictException(
+                                        "Начать можно только созданную заявку");
+                }
+
+                if (request.getWalker() == null) {
+                        throw new ConflictException(
+                                        "Перед началом назначьте выгульщика");
+                }
+
+                requireWalkerOrAdmin(
+                                request.getWalker().getId());
+
+                return changeStatus(
+                                request,
+                                RequestStatus.IN_PROGRESS);
         }
 
-        if (dto.getWalkerId() != null) {
-            request.setWalker(findWalker(dto.getWalkerId()));
+        @Transactional
+        public WalkRequestResponseDto complete(UUID id) {
+
+                WalkRequest request = findActiveRequest(id);
+
+                if (request.getStatus() != RequestStatus.IN_PROGRESS) {
+                        throw new ConflictException(
+                                        "Завершить можно только выполняемую прогулку");
+                }
+
+                if (request.getWalker() == null) {
+                        throw new ConflictException(
+                                        "У заявки отсутствует выгульщик");
+                }
+
+                requireWalkerOrAdmin(
+                                request.getWalker().getId());
+
+                request.setStatus(
+                                RequestStatus.COMPLETED);
+
+                requestRepository.saveAndFlush(request);
+
+                historyService.ensureCreated(request);
+
+                audit.record(
+                                "REQUEST_STATUS_CHANGED",
+                                EntityType.WALK_REQUEST,
+                                id,
+                                "Прогулка завершена");
+
+                return requestMapper.toDto(request);
         }
 
-        if (dto.getDistrictId() != null) {
-            assignDistrict(request, dto.getDistrictId());
+        @Transactional
+        public WalkRequestResponseDto cancel(UUID id) {
+
+                WalkRequest request = findActiveRequest(id);
+
+                requireCanManageRequest(
+                                request.getOwner().getId());
+
+                if (request.getStatus() == RequestStatus.COMPLETED ||
+                                request.getStatus() == RequestStatus.CANCELLED) {
+
+                        throw new ConflictException(
+                                        "Заявку в этом статусе нельзя отменить");
+                }
+
+                return changeStatus(
+                                request,
+                                RequestStatus.CANCELLED);
         }
 
-        if (dto.getScheduledAt() != null) {
-            validateDate(dto.getScheduledAt(), true);
-            request.setScheduledAt(dto.getScheduledAt());
+        @Transactional
+        public void archive(UUID id) {
+
+                WalkRequest request = findRequest(id);
+
+                requireCanManageRequest(
+                                request.getOwner().getId());
+
+                if (!Boolean.TRUE.equals(request.getIsArchived())) {
+
+                        request.setIsArchived(true);
+
+                        requestRepository.saveAndFlush(request);
+
+                        audit.record(
+                                        "REQUEST_ARCHIVED",
+                                        EntityType.WALK_REQUEST,
+                                        id,
+                                        "Заявка архивирована");
+                }
         }
 
-        if (dto.getDurationMinutes() != null) {
-            request.setDurationMinutes(dto.getDurationMinutes());
-            request.setPriority(
-                    RequestPriority.forDuration(
-                            dto.getDurationMinutes()
-                    )
-            );
+        @Transactional
+        public void restore(UUID id) {
+
+                WalkRequest request = findRequest(id);
+
+                requireCanManageRequest(
+                                request.getOwner().getId());
+
+                if (Boolean.TRUE.equals(request.getIsArchived())) {
+
+                        request.setIsArchived(false);
+
+                        requestRepository.saveAndFlush(request);
+
+                        audit.record(
+                                        "REQUEST_RESTORED",
+                                        EntityType.WALK_REQUEST,
+                                        id,
+                                        "Заявка восстановлена");
+                }
         }
 
-        if (dto.getAddress() != null) {
-            request.setAddress(dto.getAddress().strip());
+        @Transactional
+        public void permanentDelete(UUID id) {
+
+                if (!permanentDeleteEnabled) {
+                        throw new AccessDeniedException(
+                                        "Окончательное удаление отключено");
+                }
+
+                requireAdmin();
+
+                WalkRequest request = findRequest(id);
+
+                if (!Boolean.TRUE.equals(request.getIsArchived())) {
+                        throw new ConflictException(
+                                        "Сначала архивируйте заявку");
+                }
+
+                requestRepository.delete(request);
+                requestRepository.flush();
+
+                audit.record(
+                                "REQUEST_DELETED",
+                                EntityType.WALK_REQUEST,
+                                id,
+                                "Заявка окончательно удалена");
         }
 
-        if (dto.getDescription() != null) {
-            request.setDescription(dto.getDescription());
+        private WalkRequestResponseDto changeStatus(
+                        WalkRequest request,
+                        RequestStatus target) {
+
+                request.setStatus(target);
+
+                requestRepository.saveAndFlush(request);
+
+                audit.record(
+                                "REQUEST_STATUS_CHANGED",
+                                EntityType.WALK_REQUEST,
+                                request.getId(),
+                                "Новый статус: " + target);
+
+                return requestMapper.toDto(request);
         }
 
-        if (dto.getPrice() != null) {
-            request.setPrice(dto.getPrice());
+        private WalkRequest findRequest(UUID id) {
+
+                return requestRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Заявка не найдена"));
         }
 
-        validateValues(
-                request.getDurationMinutes(),
-                request.getPrice(),
-                request.getAddress()
-        );
+        private WalkRequest findActiveRequest(UUID id) {
 
-        requestRepository.saveAndFlush(request);
+                WalkRequest request = findRequest(id);
 
-        audit.record(
-                "REQUEST_UPDATED",
-                EntityType.WALK_REQUEST,
-                id,
-                "Заявка изменена"
-        );
+                if (Boolean.TRUE.equals(request.getIsArchived())) {
+                        throw new ConflictException(
+                                        "Нельзя изменять архивную заявку");
+                }
 
-        return requestMapper.toDto(request);
-    }
-
-    @Transactional
-    public WalkRequestResponseDto start(UUID id) {
-        WalkRequest request = findActiveRequest(id);
-
-        if (request.getStatus() != RequestStatus.CREATED) {
-            throw new ConflictException(
-                    "Начать можно только созданную заявку"
-            );
+                return request;
         }
 
-        if (request.getWalker() == null) {
-            throw new ConflictException(
-                    "Перед началом назначьте выгульщика"
-            );
+        private User findWalker(UUID id) {
+
+                User walker = userRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Выгульщик не найден"));
+
+                if (walker.getRole() != UserRole.WALKER ||
+                                !walker.isEnabled()) {
+
+                        throw new ConflictException(
+                                        "Требуется активный пользователь с ролью WALKER");
+                }
+
+                return walker;
         }
 
-        requireWalkerOrAdmin(request.getWalker().getId());
+        private void assignDistrict(
+                        WalkRequest request,
+                        UUID id) {
 
-        return changeStatus(
-                request, RequestStatus.IN_PROGRESS
-        );
-    }
+                if (id != null &&
+                                (request.getDistrict() == null ||
+                                                !id.equals(request.getDistrict().getId()))) {
 
-    @Transactional
-    public WalkRequestResponseDto complete(UUID id) {
-        WalkRequest request = findActiveRequest(id);
-
-        if (request.getStatus() != RequestStatus.IN_PROGRESS) {
-            throw new ConflictException(
-                    "Завершить можно только выполняемую прогулку"
-            );
+                        request.setDistrict(
+                                        districts.assignable(id));
+                }
         }
 
-        if (request.getWalker() == null) {
-            throw new ConflictException(
-                    "У заявки отсутствует выгульщик"
-            );
+        private void validateDate(
+                        LocalDateTime date,
+                        boolean checkFuture) {
+
+                if (date == null) {
+                        throw new BadRequestException(
+                                        "Дата прогулки обязательна");
+                }
+
+                if (checkFuture &&
+                                date.isBefore(LocalDateTime.now())) {
+
+                        throw new BadRequestException(
+                                        "Дата прогулки не может быть в прошлом");
+                }
         }
 
-        requireWalkerOrAdmin(request.getWalker().getId());
+        private void validateValues(
+                        Integer duration,
+                        Double price,
+                        String address) {
 
-        request.setStatus(RequestStatus.COMPLETED);
-        requestRepository.saveAndFlush(request);
+                if (duration == null || duration <= 0) {
+                        throw new BadRequestException(
+                                        "Длительность должна быть больше нуля");
+                }
 
-        // Уникальный ключ walk_request_id в БД
-        // не позволит создать две истории одной прогулки.
-        historyService.ensureCreated(request);
+                if (price == null ||
+                                !Double.isFinite(price) ||
+                                price < 0 ||
+                                price > 99999999.99) {
 
-        audit.record(
-                "REQUEST_STATUS_CHANGED",
-                EntityType.WALK_REQUEST,
-                id,
-                "Прогулка завершена"
-        );
+                        throw new BadRequestException(
+                                        "Недопустимая цена заявки");
+                }
 
-        return requestMapper.toDto(request);
-    }
+                if (address == null ||
+                                address.isBlank() ||
+                                address.length() > 200) {
 
-    @Transactional
-    public WalkRequestResponseDto cancel(UUID id) {
-        WalkRequest request = findActiveRequest(id);
-
-        requireOwnerOrAdmin(request.getOwner().getId());
-
-        if (request.getStatus() == RequestStatus.COMPLETED ||
-                request.getStatus() == RequestStatus.CANCELLED) {
-            throw new ConflictException(
-                    "Заявку в этом статусе нельзя отменить"
-            );
+                        throw new BadRequestException(
+                                        "Адрес обязателен и не должен превышать 200 символов");
+                }
         }
 
-        return changeStatus(
-                request, RequestStatus.CANCELLED
-        );
-    }
+        private UUID currentUserId() {
 
-    @Transactional
-    public void archive(UUID id) {
-        WalkRequest request = findRequest(id);
+                Authentication authentication = SecurityContextHolder.getContext()
+                                .getAuthentication();
 
-        requireOwnerOrAdmin(request.getOwner().getId());
+                if (authentication == null ||
+                                !(authentication.getPrincipal() instanceof Jwt jwt)) {
 
-        if (!Boolean.TRUE.equals(request.getIsArchived())) {
-            request.setIsArchived(true);
-            requestRepository.saveAndFlush(request);
+                        throw new AccessDeniedException(
+                                        "Требуется авторизация");
+                }
 
-            audit.record(
-                    "REQUEST_ARCHIVED",
-                    EntityType.WALK_REQUEST,
-                    id,
-                    "Заявка архивирована"
-            );
-        }
-    }
-
-    @Transactional
-    public void restore(UUID id) {
-        WalkRequest request = findRequest(id);
-
-        requireOwnerOrAdmin(request.getOwner().getId());
-
-        if (Boolean.TRUE.equals(request.getIsArchived())) {
-            request.setIsArchived(false);
-            requestRepository.saveAndFlush(request);
-
-            audit.record(
-                    "REQUEST_RESTORED",
-                    EntityType.WALK_REQUEST,
-                    id,
-                    "Заявка восстановлена"
-            );
-        }
-    }
-
-    @Transactional
-    public void permanentDelete(UUID id) {
-
-        if (!permanentDeleteEnabled) {
-            throw new AccessDeniedException(
-                    "Окончательное удаление отключено"
-            );
+                return UUID.fromString(
+                                jwt.getSubject());
         }
 
-        requireAdmin();
+        private boolean hasAuthority(String authority) {
 
-        WalkRequest request = findRequest(id);
+                Authentication authentication = SecurityContextHolder.getContext()
+                                .getAuthentication();
 
-        if (!Boolean.TRUE.equals(request.getIsArchived())) {
-            throw new ConflictException(
-                    "Сначала архивируйте заявку"
-            );
+                return authentication != null &&
+                                authentication.getAuthorities().stream()
+                                                .anyMatch(a -> a.getAuthority().equals(authority));
         }
 
-        requestRepository.delete(request);
-        requestRepository.flush();
-
-        audit.record(
-                "REQUEST_DELETED",
-                EntityType.WALK_REQUEST,
-                id,
-                "Заявка окончательно удалена"
-        );
-    }
-
-    private WalkRequestResponseDto changeStatus(
-            WalkRequest request,
-            RequestStatus target
-    ) {
-        request.setStatus(target);
-        requestRepository.saveAndFlush(request);
-
-        audit.record(
-                "REQUEST_STATUS_CHANGED",
-                EntityType.WALK_REQUEST,
-                request.getId(),
-                "Новый статус: " + target
-        );
-
-        return requestMapper.toDto(request);
-    }
-
-    private WalkRequest findRequest(UUID id) {
-        return requestRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Заявка не найдена"
-                        ));
-    }
-
-    private WalkRequest findActiveRequest(UUID id) {
-        WalkRequest request = findRequest(id);
-
-        if (Boolean.TRUE.equals(request.getIsArchived())) {
-            throw new ConflictException(
-                    "Нельзя изменять архивную заявку"
-            );
+        private boolean isAdmin() {
+                return hasAuthority("ROLE_ADMIN");
         }
 
-        return request;
-    }
-
-    private User findWalker(UUID id) {
-        User walker = userRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Выгульщик не найден"
-                        ));
-
-        if (walker.getRole() != UserRole.WALKER ||
-                !walker.isEnabled()) {
-            throw new ConflictException(
-                    "Требуется активный пользователь с ролью WALKER"
-            );
+        private boolean isEditor() {
+                return hasAuthority("ROLE_EDITOR");
         }
 
-        return walker;
-    }
-
-    private void assignDistrict(WalkRequest request, UUID id) {
-        if (id != null &&
-                (request.getDistrict() == null ||
-                !id.equals(request.getDistrict().getId()))) {
-            request.setDistrict(districts.assignable(id));
-        }
-    }
-
-    private void validateDate(
-            LocalDateTime date,
-            boolean checkFuture
-    ) {
-        if (date == null) {
-            throw new BadRequestException(
-                    "Дата прогулки обязательна"
-            );
+        private boolean isViewer() {
+                return hasAuthority("ROLE_VIEWER");
         }
 
-        if (checkFuture && date.isBefore(LocalDateTime.now())) {
-            throw new BadRequestException(
-                    "Дата прогулки не может быть в прошлом"
-            );
-        }
-    }
-
-    private void validateValues(
-            Integer duration,
-            Double price,
-            String address
-    ) {
-        if (duration == null || duration <= 0) {
-            throw new BadRequestException(
-                    "Длительность должна быть больше нуля"
-            );
+        private boolean isWalker() {
+                return hasAuthority("ROLE_WALKER");
         }
 
-        if (price == null ||
-                !Double.isFinite(price) ||
-                price < 0 ||
-                price > 99999999.99) {
-            throw new BadRequestException(
-                    "Недопустимая цена заявки"
-            );
+        private void requireRequestReadAccess(WalkRequest request) {
+                UUID userId = currentUserId();
+
+                if (isAdmin() || isEditor()) {
+                        return;
+                }
+
+                if (hasAuthority("ROLE_OWNER")) {
+                        if (request.getOwner() != null &&
+                                        userId.equals(request.getOwner().getId())) {
+                                return;
+                        }
+
+                        throw new AccessDeniedException(
+                                        "Нет доступа к чужой заявке");
+                }
+
+                if (isWalker()) {
+                        if (request.getWalker() != null &&
+                                        userId.equals(request.getWalker().getId())) {
+                                return;
+                        }
+
+                        throw new AccessDeniedException(
+                                        "Заявка не назначена этому выгульщику");
+                }
+
+                if (isViewer()) {
+                        return;
+                }
+
+                throw new AccessDeniedException(
+                                "Нет доступа к этой заявке");
         }
 
-        if (address == null ||
-                address.isBlank() ||
-                address.length() > 200) {
-            throw new BadRequestException(
-                    "Адрес обязателен и не должен превышать 200 символов"
-            );
+        private Specification<WalkRequest> applyUserScope(
+                        Specification<WalkRequest> specification) {
+                UUID userId = currentUserId();
+
+                if (isAdmin() || isEditor()) {
+                        return specification;
+                }
+
+                if (hasAuthority("ROLE_OWNER")) {
+                        return specification.and((root, query, cb) -> cb.equal(root.get("owner").get("id"), userId));
+                }
+
+                if (isWalker()) {
+                        return specification.and((root, query, cb) -> cb.equal(root.get("walker").get("id"), userId));
+                }
+
+                if (isViewer()) {
+                        return specification;
+                }
+
+                throw new AccessDeniedException(
+                                "Нет доступа к списку заявок");
         }
-    }
 
-    private UUID currentUserId() {
-        Authentication authentication =
-                SecurityContextHolder.getContext()
-                        .getAuthentication();
+        private void requireCanManageRequest(UUID ownerId) {
 
-        if (authentication == null ||
-                !(authentication.getPrincipal() instanceof Jwt jwt)) {
-            throw new AccessDeniedException(
-                    "Требуется авторизация"
-            );
+                if (isAdmin() || isEditor()) {
+                        return;
+                }
+
+                if (hasAuthority("ROLE_OWNER") &&
+                                ownerId.equals(currentUserId())) {
+                        return;
+                }
+
+                throw new AccessDeniedException(
+                                "Изменять заявку может только её владелец, редактор или администратор");
         }
 
-        return UUID.fromString(jwt.getSubject());
-    }
+        private void requireWalkerOrAdmin(UUID walkerId) {
 
-    private boolean isAdmin() {
-        Authentication authentication =
-                SecurityContextHolder.getContext()
-                        .getAuthentication();
+                if (isAdmin()) {
+                        return;
+                }
 
-        return authentication != null &&
-                authentication.getAuthorities().stream()
-                        .anyMatch(a ->
-                                a.getAuthority().equals("ROLE_ADMIN")
-                        );
-    }
+                if (isWalker() &&
+                                walkerId.equals(currentUserId())) {
+                        return;
+                }
 
-    private void requireAdmin() {
-        if (!isAdmin()) {
-            throw new AccessDeniedException(
-                    "Операция доступна только администратору"
-            );
+                throw new AccessDeniedException(
+                                "Операция доступна только назначенному выгульщику или администратору");
         }
-    }
 
-    private void requireOwnerOrAdmin(UUID ownerId) {
-        if (!isAdmin() &&
-                !ownerId.equals(currentUserId())) {
-            throw new AccessDeniedException(
-                    "Изменять заявку может её владелец или администратор"
-            );
-        }
-    }
+        private void requireAdmin() {
 
-    private void requireWalkerOrAdmin(UUID walkerId) {
-        if (!isAdmin() &&
-                !walkerId.equals(currentUserId())) {
-            throw new AccessDeniedException(
-                    "Операция доступна назначенному выгульщику"
-            );
+                if (!isAdmin()) {
+                        throw new AccessDeniedException(
+                                        "Операция доступна только администратору");
+                }
         }
-    }
 }

@@ -18,6 +18,7 @@ import ru.mirea.petgo.filter.PageSort;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
+import ru.mirea.petgo.domain.AccessLevel;
 
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PetService {
     private static final Set<String> SORT_FIELDS = Set.of("id", "name", "breed", "age", "weight", "createdAt");
+
     private final PetRepository pets;
     private final UserRepository users;
     private final WalkRequestRepository requests;
@@ -35,18 +37,28 @@ public class PetService {
     public Page<PetDto> list(UUID authenticatedUserId, Pageable page) {
         User currentUser = requireActiveUser(authenticatedUserId);
         Pageable sorted = PageSort.apply(page, Sort.by("name"), SORT_FIELDS);
-        Page<Pet> result = currentUser.getRole() == UserRole.OWNER
-                ? pets.findAllByOwner_Id(authenticatedUserId, sorted)
-                : pets.findAll(sorted);
+
+        // Админ и Редактор видят всех питомцев. Обычный пользователь (VIEWER) — только
+        // своих.
+        boolean canSeeAll = currentUser.getAccessLevel() == AccessLevel.ADMIN
+                || currentUser.getAccessLevel() == AccessLevel.EDITOR;
+
+        Page<Pet> result = canSeeAll
+                ? pets.findAll(sorted)
+                : pets.findAllByOwner_Id(authenticatedUserId, sorted);
         return result.map(PetDto::from);
     }
 
     @Transactional(readOnly = true)
     public PetDto get(UUID id, UUID authenticatedUserId) {
         User currentUser = requireActiveUser(authenticatedUserId);
-        Pet pet = currentUser.getRole() == UserRole.OWNER
-                ? findOwned(id, authenticatedUserId)
-                : pets.findById(id).orElseThrow(() -> new ResourceNotFoundException("Питомец не найден"));
+
+        boolean canSeeAll = currentUser.getAccessLevel() == AccessLevel.ADMIN
+                || currentUser.getAccessLevel() == AccessLevel.EDITOR;
+
+        Pet pet = canSeeAll
+                ? pets.findById(id).orElseThrow(() -> new ResourceNotFoundException("Питомец не найден"))
+                : findOwned(id, authenticatedUserId);
         return PetDto.from(pet);
     }
 

@@ -1,3 +1,4 @@
+
 package ru.mirea.petgo.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,10 +41,22 @@ import java.util.List;
 
 @Configuration
 public class SecurityConfig {
+
     public static final String SWAGGER_COOKIE = "petgo_swagger";
-    private static final String[] DOCS = {"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"};
-    private static final String[] READ_LEVELS = {"VIEWER", "EDITOR", "ADMIN"};
-    private static final String[] WRITE_LEVELS = {"EDITOR", "ADMIN"};
+
+    private static final String[] DOCS = {
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/v3/api-docs/**"
+    };
+
+    private static final String[] READ_LEVELS = {
+            "VIEWER", "EDITOR", "ADMIN"
+    };
+
+    private static final String[] WRITE_LEVELS = {
+            "EDITOR", "ADMIN"
+    };
 
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -51,11 +64,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecretKey jwtKey(@Value("${app.jwt.secret-base64}") String encoded) {
+    SecretKey jwtKey(
+            @Value("${app.jwt.secret-base64}") String encoded) {
         byte[] raw = Base64.getDecoder().decode(encoded);
+
         if (raw.length < 32) {
-            throw new IllegalArgumentException("JWT_SECRET_BASE64 должен содержать не менее 32 случайных байт");
+            throw new IllegalArgumentException(
+                    "JWT_SECRET_BASE64 должен содержать не менее 32 случайных байт");
         }
+
         return new SecretKeySpec(raw, "HmacSHA256");
     }
 
@@ -65,80 +82,305 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey key, @Value("${app.jwt.issuer}") String issuer) {
+    JwtDecoder jwtDecoder(
+            SecretKey key,
+            @Value("${app.jwt.issuer}") String issuer) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).build();
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                new JwtIssuerValidator(issuer), new JwtTimestampValidator(Duration.ZERO)));
+
+        decoder.setJwtValidator(
+                new DelegatingOAuth2TokenValidator<>(
+                        new JwtIssuerValidator(issuer),
+                        new JwtTimestampValidator(Duration.ZERO)));
+
         return decoder;
     }
 
     @Bean
-    UrlBasedCorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}") String origins) {
+    UrlBasedCorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins}") String origins) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::strip)
-                .filter(origin -> !origin.isEmpty()).toList());
-        config.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-ID"));
-        config.setExposedHeaders(List.of("X-Correlation-ID", "Content-Disposition"));
+
+        config.setAllowedOrigins(
+                Arrays.stream(origins.split(","))
+                        .map(String::strip)
+                        .filter(origin -> !origin.isEmpty())
+                        .toList());
+
+        config.setAllowedMethods(List.of(
+                "GET", "HEAD", "POST", "PUT",
+                "PATCH", "DELETE", "OPTIONS"));
+
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "X-Correlation-ID"));
+
+        config.setExposedHeaders(List.of(
+                "X-Correlation-ID",
+                "Content-Disposition"));
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/api/**", config);
+
         return source;
     }
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, AccountAuthentication accounts, ObjectMapper json)
-            throws Exception {
+    SecurityFilterChain apiSecurity(
+            HttpSecurity http,
+            AccountAuthentication accounts,
+            ObjectMapper json) throws Exception {
+
         AuthenticationEntryPoint unauthorized = (request, response, error) -> {
-            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            json.writeValue(response.getOutputStream(),
-                    new ApiError(Instant.now(), 401, "Unauthorized", "Требуется действующая авторизация"));
+            response.setHeader(
+                    HttpHeaders.WWW_AUTHENTICATE,
+                    "Bearer");
+
+            response.setStatus(
+                    HttpStatus.UNAUTHORIZED.value());
+
+            response.setContentType(
+                    MediaType.APPLICATION_JSON_VALUE);
+
+            json.writeValue(
+                    response.getOutputStream(),
+                    new ApiError(
+                            Instant.now(),
+                            401,
+                            "Unauthorized",
+                            "Требуется действующая авторизация"));
         };
+
         AccessDeniedHandler forbidden = (request, response, error) -> {
-            response.setStatus(HttpStatus.FORBIDDEN.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            json.writeValue(response.getOutputStream(),
-                    new ApiError(Instant.now(), 403, "Forbidden", "Недостаточно прав для операции"));
+            response.setStatus(
+                    HttpStatus.FORBIDDEN.value());
+
+            response.setContentType(
+                    MediaType.APPLICATION_JSON_VALUE);
+
+            json.writeValue(
+                    response.getOutputStream(),
+                    new ApiError(
+                            Instant.now(),
+                            403,
+                            "Forbidden",
+                            "Недостаточно прав для операции"));
         };
+
         DefaultBearerTokenResolver bearer = new DefaultBearerTokenResolver();
-        return http.csrf(AbstractHttpConfigurer::disable)
+
+        return http
+                .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .sessionManagement(session -> session.sessionCreationPolicy(
+                        SessionCreationPolicy.STATELESS))
+
                 .authorizeHttpRequests(auth -> auth
-                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/change-password").authenticated()
-                        .requestMatchers(DOCS).hasRole("ADMIN")
-                        .requestMatchers("/api/admin/**", "/api/walk-requests/*/permanent").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/districts/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/districts/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/districts/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/pets", "/api/pets/**").hasRole("OWNER")
-                        .requestMatchers(HttpMethod.PUT, "/api/pets", "/api/pets/**").hasRole("OWNER")
-                        .requestMatchers(HttpMethod.PATCH, "/api/pets", "/api/pets/**").hasRole("OWNER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/pets", "/api/pets/**").hasRole("OWNER")
-                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole(READ_LEVELS)
-                        .requestMatchers(HttpMethod.HEAD, "/api/**").hasAnyRole(READ_LEVELS)
-                        .requestMatchers("/api/**").hasAnyRole(WRITE_LEVELS)
+
+                        // Служебные маршруты
+                        .dispatcherTypeMatchers(
+                                DispatcherType.ERROR)
+                        .permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/actuator/health",
+                                "/actuator/info")
+                        .permitAll()
+
+                        // Авторизация
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/logout")
+                        .permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/auth/me")
+                        .authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/change-password")
+                        .authenticated()
+
+                        // Swagger
+                        .requestMatchers(DOCS)
+                        .hasRole("ADMIN")
+
+                        // Администрирование и окончательное удаление
+                        .requestMatchers(
+                                "/api/admin/**",
+                                "/api/walk-requests/*/permanent")
+                        .hasRole("ADMIN")
+
+                        // Районами управляет только ADMIN
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/districts/**")
+                        .hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/districts/**")
+                        .hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/districts/**")
+                        .hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/districts/**")
+                        .hasRole("ADMIN")
+
+                        // Питомцы: владелец может читать только свои.
+                        // Ограничение по владельцу реализовано в PetService.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/pets",
+                                "/api/pets/**")
+                        .hasAnyRole(
+                                "OWNER", "VIEWER", "EDITOR", "ADMIN")
+
+                        // Создание и управление питомцами
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/pets",
+                                "/api/pets/**")
+                        .hasRole("OWNER")
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/pets",
+                                "/api/pets/**")
+                        .hasRole("OWNER")
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/pets",
+                                "/api/pets/**")
+                        .hasRole("OWNER")
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/pets",
+                                "/api/pets/**")
+                        .hasRole("OWNER")
+
+                        // Заявки: чтение.
+                        // OWNER и WALKER получают только свои заявки
+                        // благодаря фильтрации в WalkRequestService.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/walk-requests",
+                                "/api/walk-requests/**")
+                        .hasAnyRole(
+                                "OWNER",
+                                "WALKER",
+                                "VIEWER",
+                                "EDITOR",
+                                "ADMIN")
+
+                        // Создание заявки
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/walk-requests")
+                        .hasAnyRole(
+                                "OWNER", "EDITOR", "ADMIN")
+
+                        // Изменение заявки
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/walk-requests/**")
+                        .hasAnyRole(
+                                "OWNER", "EDITOR", "ADMIN")
+
+                        // Начало прогулки
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/walk-requests/*/start")
+                        .hasAnyRole(
+                                "WALKER", "ADMIN")
+
+                        // Завершение прогулки
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/walk-requests/*/complete")
+                        .hasAnyRole(
+                                "WALKER", "ADMIN")
+
+                        // Отмена заявки
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/walk-requests/*/cancel")
+                        .hasAnyRole(
+                                "OWNER", "EDITOR", "ADMIN")
+
+                        // Восстановление заявки
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/walk-requests/*/restore")
+                        .hasAnyRole(
+                                "OWNER", "EDITOR", "ADMIN")
+
+                        // Архивирование заявки
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/walk-requests/*")
+                        .hasAnyRole(
+                                "OWNER", "EDITOR", "ADMIN")
+
+                        // Остальные GET-запросы
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/**")
+                        .hasAnyRole(READ_LEVELS)
+
+                        .requestMatchers(
+                                HttpMethod.HEAD,
+                                "/api/**")
+                        .hasAnyRole(READ_LEVELS)
+
+                        // Остальные операции записи
+                        .requestMatchers("/api/**")
+                        .hasAnyRole(WRITE_LEVELS)
+
                         .anyRequest().denyAll())
-                .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
+
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint(unauthorized)
+                        .accessDeniedHandler(forbidden))
+
                 .oauth2ResourceServer(jwt -> jwt
-                        .bearerTokenResolver(request -> resolveToken(bearer, request))
+                        .bearerTokenResolver(
+                                request -> resolveToken(bearer, request))
                         .authenticationEntryPoint(unauthorized)
                         .jwt(config -> config.jwtAuthenticationConverter(accounts)))
+
                 .build();
     }
 
-    private static String resolveToken(DefaultBearerTokenResolver bearer, HttpServletRequest request) {
+    private static String resolveToken(
+            DefaultBearerTokenResolver bearer,
+            HttpServletRequest request) {
         String token = bearer.resolve(request);
+
         if (token != null || request.getCookies() == null) {
             return token;
         }
+
         for (String path : DOCS) {
-            if (PathPatternRequestMatcher.withDefaults().matcher(path).matches(request)) {
+            if (PathPatternRequestMatcher
+                    .withDefaults()
+                    .matcher(path)
+                    .matches(request)) {
+
                 for (Cookie cookie : request.getCookies()) {
                     if (SWAGGER_COOKIE.equals(cookie.getName())) {
                         return cookie.getValue();
@@ -146,6 +388,7 @@ public class SecurityConfig {
                 }
             }
         }
+
         return null;
     }
 }
