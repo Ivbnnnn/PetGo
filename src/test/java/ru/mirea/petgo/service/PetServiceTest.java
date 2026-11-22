@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
+import ru.mirea.petgo.domain.AccessLevel;
 import ru.mirea.petgo.domain.Pet;
 import ru.mirea.petgo.domain.User;
 import ru.mirea.petgo.domain.UserRole;
@@ -54,7 +55,7 @@ class PetServiceTest {
     void listReturnsOnlyAuthenticatedOwnersPets() {
         when(pets.findAllByOwner_Id(eq(ownerId), any())).thenReturn(new PageImpl<>(List.of()));
 
-        service.list(ownerId, PageRequest.of(0, 20));
+        service.list(ownerId, otherOwnerId, PageRequest.of(0, 20));
 
         verify(pets).findAllByOwner_Id(eq(ownerId), any());
         verify(pets, never()).findAll(any(org.springframework.data.domain.Pageable.class));
@@ -155,15 +156,40 @@ class PetServiceTest {
         User walker = new User();
         walker.setId(ownerId);
         walker.setRole(UserRole.WALKER);
+        walker.setAccessLevel(AccessLevel.EDITOR);
         walker.setEnabled(true);
         when(users.findById(ownerId)).thenReturn(Optional.of(walker));
         when(pets.findAll(any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        assertDoesNotThrow(() -> service.list(ownerId, PageRequest.of(0, 20)));
+        assertDoesNotThrow(() -> service.list(ownerId, null, PageRequest.of(0, 20)));
         assertThrows(AccessDeniedException.class, () -> service.create(ownerId, write(null)));
         verify(pets).findAll(any(org.springframework.data.domain.Pageable.class));
         verify(pets, never()).save(any(Pet.class));
+    }
+
+    @Test
+    void administratorCanManageAnotherOwnersPetRegardlessOfDomainRole() {
+        UUID adminId = UUID.randomUUID();
+        User admin = new User();
+        admin.setId(adminId);
+        admin.setRole(UserRole.WALKER);
+        admin.setAccessLevel(AccessLevel.ADMIN);
+        when(users.findById(adminId)).thenReturn(Optional.of(admin));
+        when(pets.save(any(Pet.class))).thenAnswer(invocation -> {
+            Pet saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            when(pets.findById(saved.getId())).thenReturn(Optional.of(saved));
+            return saved;
+        });
+
+        PetDto created = service.create(adminId, write(ownerId));
+        PetDto updated = service.update(created.id(), adminId, write(null));
+        service.delete(created.id(), adminId);
+
+        assertEquals(ownerId, created.ownerId());
+        assertEquals(ownerId, updated.ownerId());
+        verify(pets).delete(argThat(pet -> pet.getId().equals(created.id())));
     }
 
     @Test

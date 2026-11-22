@@ -22,8 +22,9 @@ public class PetController {
     private final PetService pets;
 
     @GetMapping
-    public Page<PetDto> list(@AuthenticationPrincipal Jwt jwt, Pageable page) {
-        return pets.list(currentUserId(jwt), page);
+    public Page<PetDto> list(@AuthenticationPrincipal Jwt jwt,
+                             @RequestParam(required = false) UUID ownerId, Pageable page) {
+        return pets.list(currentUserId(jwt), ownerId, page);
     }
 
     @GetMapping("/{id}")

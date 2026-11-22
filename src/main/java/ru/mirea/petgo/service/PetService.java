@@ -7,18 +7,19 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.mirea.petgo.domain.AccessLevel;
 import ru.mirea.petgo.domain.AuditEvent.EntityType;
 import ru.mirea.petgo.domain.Pet;
 import ru.mirea.petgo.domain.User;
 import ru.mirea.petgo.domain.UserRole;
 import ru.mirea.petgo.dto.PetDto;
+import ru.mirea.petgo.error.BadRequestException;
 import ru.mirea.petgo.error.ConflictException;
 import ru.mirea.petgo.error.ResourceNotFoundException;
 import ru.mirea.petgo.filter.PageSort;
 import ru.mirea.petgo.repository.PetRepository;
 import ru.mirea.petgo.repository.UserRepository;
 import ru.mirea.petgo.repository.WalkRequestRepository;
-import ru.mirea.petgo.domain.AccessLevel;
 
 import java.util.Set;
 import java.util.UUID;
@@ -34,18 +35,12 @@ public class PetService {
     private final AuditService audit;
 
     @Transactional(readOnly = true)
-    public Page<PetDto> list(UUID authenticatedUserId, Pageable page) {
+    public Page<PetDto> list(UUID authenticatedUserId, UUID ownerId, Pageable page) {
         User currentUser = requireActiveUser(authenticatedUserId);
         Pageable sorted = PageSort.apply(page, Sort.by("name"), SORT_FIELDS);
-
-        // Админ и Редактор видят всех питомцев. Обычный пользователь (VIEWER) — только
-        // своих.
-        boolean canSeeAll = currentUser.getAccessLevel() == AccessLevel.ADMIN
-                || currentUser.getAccessLevel() == AccessLevel.EDITOR;
-
-        Page<Pet> result = canSeeAll
-                ? pets.findAll(sorted)
-                : pets.findAllByOwner_Id(authenticatedUserId, sorted);
+        UUID visibleOwner = canSeeAll(currentUser) ? ownerId : authenticatedUserId;
+        Page<Pet> result = visibleOwner == null
+                ? pets.findAll(sorted) : pets.findAllByOwner_Id(visibleOwner, sorted);
         return result.map(PetDto::from);
     }
 
@@ -53,19 +48,26 @@ public class PetService {
     public PetDto get(UUID id, UUID authenticatedUserId) {
         User currentUser = requireActiveUser(authenticatedUserId);
 
-        boolean canSeeAll = currentUser.getAccessLevel() == AccessLevel.ADMIN
-                || currentUser.getAccessLevel() == AccessLevel.EDITOR;
-
-        Pet pet = canSeeAll
-                ? pets.findById(id).orElseThrow(() -> new ResourceNotFoundException("Питомец не найден"))
+        Pet pet = canSeeAll(currentUser)
+                ? find(id)
                 : findOwned(id, authenticatedUserId);
         return PetDto.from(pet);
     }
 
     @Transactional
     public PetDto create(UUID authenticatedUserId, PetDto.Write input) {
-        User owner = requireOwner(authenticatedUserId);
-        rejectOwnerSubstitution(input.ownerId(), authenticatedUserId);
+        User currentUser = requireActiveUser(authenticatedUserId);
+        UUID ownerId = input.ownerId();
+        User owner;
+        if (isAdmin(currentUser) && ownerId != null) {
+            owner = requireOwner(requireActiveUser(ownerId));
+        } else {
+            if (isAdmin(currentUser) && currentUser.getRole() != UserRole.OWNER) {
+                throw new BadRequestException("Укажите владельца питомца");
+            }
+            rejectOwnerSubstitution(ownerId, authenticatedUserId);
+            owner = requireOwner(currentUser);
+        }
         Pet pet = new Pet();
         pet.setOwner(owner);
         updateDetails(pet, input);
@@ -76,9 +78,19 @@ public class PetService {
 
     @Transactional
     public PetDto update(UUID id, UUID authenticatedUserId, PetDto.Write input) {
-        requireOwner(authenticatedUserId);
-        rejectOwnerSubstitution(input.ownerId(), authenticatedUserId);
-        Pet pet = findOwned(id, authenticatedUserId);
+        User currentUser = requireActiveUser(authenticatedUserId);
+        Pet pet = findEditable(id, currentUser);
+        UUID ownerId = input.ownerId();
+        if (isAdmin(currentUser)) {
+            if (ownerId != null && !ownerId.equals(pet.getOwner().getId())) {
+                if (requests.existsByPet_Id(id)) {
+                    throw new ConflictException("Нельзя сменить владельца питомца, у которого есть заявки на выгул");
+                }
+                pet.setOwner(requireOwner(requireActiveUser(ownerId)));
+            }
+        } else {
+            rejectOwnerSubstitution(ownerId, authenticatedUserId);
+        }
         updateDetails(pet, input);
         audit.record("PET_UPDATED", EntityType.PET, id, "Изменены данные питомца");
         return PetDto.from(pet);
@@ -86,8 +98,7 @@ public class PetService {
 
     @Transactional
     public void delete(UUID id, UUID authenticatedUserId) {
-        requireOwner(authenticatedUserId);
-        Pet pet = findOwned(id, authenticatedUserId);
+        Pet pet = findEditable(id, requireActiveUser(authenticatedUserId));
         if (requests.existsByPet_Id(id)) {
             throw new ConflictException("Нельзя удалить питомца, у которого есть заявки на выгул");
         }
@@ -100,6 +111,22 @@ public class PetService {
                 .orElseThrow(() -> new ResourceNotFoundException("Питомец не найден"));
     }
 
+    private Pet find(UUID id) {
+        return pets.findById(id).orElseThrow(() -> new ResourceNotFoundException("Питомец не найден"));
+    }
+
+    private Pet findEditable(UUID id, User currentUser) {
+        return isAdmin(currentUser) ? find(id) : findOwned(id, requireOwner(currentUser).getId());
+    }
+
+    private boolean canSeeAll(User user) {
+        return isAdmin(user) || user.getAccessLevel() == AccessLevel.EDITOR;
+    }
+
+    private boolean isAdmin(User user) {
+        return user.getAccessLevel() == AccessLevel.ADMIN;
+    }
+
     private User requireActiveUser(UUID userId) {
         User user = users.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден"));
@@ -109,10 +136,9 @@ public class PetService {
         return user;
     }
 
-    private User requireOwner(UUID userId) {
-        User user = requireActiveUser(userId);
+    private User requireOwner(User user) {
         if (user.getRole() != UserRole.OWNER) {
-            throw new AccessDeniedException("Управлять питомцами может только владелец");
+            throw new AccessDeniedException("Питомцу требуется учётная запись владельца");
         }
         return user;
     }

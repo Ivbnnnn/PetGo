@@ -58,6 +58,8 @@ public class WalkRequestService {
         @Transactional
         public WalkRequestResponseDto create(WalkRequestCreateDto dto) {
 
+                requireCanCreateRequest(dto.getOwnerId());
+
                 Pet pet = petRepository.findById(dto.getPetId())
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Питомец не найден"));
@@ -76,8 +78,6 @@ public class WalkRequestService {
                         throw new ConflictException(
                                         "Питомец принадлежит другому владельцу");
                 }
-
-                requireCanManageRequest(owner.getId());
 
                 validateDate(dto.getScheduledAt(), true);
 
@@ -187,7 +187,7 @@ public class WalkRequestService {
                                         dto.getDistrictId());
                 }
 
-                if (dto.getScheduledAt() != null) {
+                if (dto.getScheduledAt() != null && !dto.getScheduledAt().equals(request.getScheduledAt())) {
                         validateDate(
                                         dto.getScheduledAt(),
                                         true);
@@ -608,6 +608,15 @@ public class WalkRequestService {
 
                 throw new AccessDeniedException(
                                 "Изменять заявку может только её владелец, редактор или администратор");
+        }
+
+        private void requireCanCreateRequest(UUID ownerId) {
+                if (isAdmin() || hasAuthority("ROLE_OWNER") && currentUserId().equals(ownerId)) {
+                        return;
+                }
+
+                throw new AccessDeniedException(
+                                "Создать заявку может её владелец или администратор");
         }
 
         private void requireWalkerOrAdmin(UUID walkerId) {

@@ -253,25 +253,25 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/pets",
                                 "/api/pets/**")
-                        .hasRole("OWNER")
+                        .hasAnyRole("OWNER", "ADMIN")
 
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/pets",
                                 "/api/pets/**")
-                        .hasRole("OWNER")
+                        .hasAnyRole("OWNER", "ADMIN")
 
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/pets",
                                 "/api/pets/**")
-                        .hasRole("OWNER")
+                        .hasAnyRole("OWNER", "ADMIN")
 
                         .requestMatchers(
                                 HttpMethod.DELETE,
                                 "/api/pets",
                                 "/api/pets/**")
-                        .hasRole("OWNER")
+                        .hasAnyRole("OWNER", "ADMIN")
 
                         // Заявки: чтение.
                         // OWNER и WALKER получают только свои заявки
@@ -291,8 +291,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/walk-requests")
-                        .hasAnyRole(
-                                "OWNER", "EDITOR", "ADMIN")
+                        .hasAnyRole("OWNER", "ADMIN")
 
                         // Изменение заявки
                         .requestMatchers(
