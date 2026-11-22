@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-import { apiFetch as api } from "../api/client";
+import { apiFetch as api, fetchAllPages } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { isAdmin, isOwner } from "../utils/roles";
 
 export default function PetsPage() {
+  const { user } = useAuth();
+  const admin = isAdmin(user);
+  const owner = isOwner(user);
   const [pets, setPets] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", breed: "", weight: "", age: "", specialNeeds: "", photoUrl: "" });
+  const [owners, setOwners] = useState([]);
+  const [ownerId, setOwnerId] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -22,8 +29,16 @@ export default function PetsPage() {
 
   useEffect(() => { load(); }, [page]);
 
+  useEffect(() => {
+    if (!admin) return;
+    fetchAllPages("/admin/users")
+      .then(users => setOwners(users.filter(account => account.enabled && isOwner(account))))
+      .catch(e => setError(e.message));
+  }, [admin]);
+
   function openCreate() {
     setEditing("new");
+    setOwnerId("");
     setForm({ name: "", breed: "", weight: "", age: "", specialNeeds: "", photoUrl: "" });
   }
 
@@ -40,6 +55,7 @@ export default function PetsPage() {
     try {
       const body = {
         ...form,
+        ...(admin && editing === "new" && { ownerId }),
         weight: form.weight ? Number(form.weight) : null,
         age: form.age ? Number(form.age) : null,
       };
@@ -68,7 +84,7 @@ export default function PetsPage() {
     <main style={{ padding: 24, maxWidth: 1000, margin: "auto" }}>
       <h1>Питомцы</h1>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
-      <button onClick={openCreate}>Добавить питомца</button>
+      {(admin || owner) && <button onClick={openCreate}>Добавить питомца</button>}
 
       <table cellPadding="9" border="1" style={{ width: "100%", marginTop: 16 }}>
         <thead>
@@ -82,8 +98,12 @@ export default function PetsPage() {
               <td>{p.weight || "—"}</td>
               <td>{p.age || "—"}</td>
               <td>
-                <button onClick={() => openEdit(p)}>Изменить</button>
-                <button onClick={() => remove(p)}>Удалить</button>
+                {(admin || (owner && p.ownerId === user.id)) && (
+                  <>
+                    <button onClick={() => openEdit(p)}>Изменить</button>
+                    <button onClick={() => remove(p)}>Удалить</button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
@@ -100,9 +120,18 @@ export default function PetsPage() {
         <section style={{ border: "1px solid #aaa", padding: 20, marginTop: 24 }}>
           <h2>{editing === "new" ? "Новый питомец" : "Редактирование"}</h2>
           <form onSubmit={save} style={{ display: "grid", gap: 12 }}>
+            {admin && editing === "new" && (
+              <label>
+                Владелец
+                <select value={ownerId} onChange={e => setOwnerId(e.target.value)} required>
+                  <option value="">Выберите владельца</option>
+                  {owners.map(account => <option key={account.id} value={account.id}>{account.username} ({account.email})</option>)}
+                </select>
+              </label>
+            )}
             <input placeholder="Имя" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
             <input placeholder="Порода" value={form.breed} onChange={e => setForm({...form, breed: e.target.value})} />
-            <input type="number" placeholder="Вес (кг)" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} />
+            <input type="number" step="0.01" min="0.01" placeholder="Вес (кг)" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} />
             <input type="number" placeholder="Возраст" value={form.age} onChange={e => setForm({...form, age: e.target.value})} />
             <textarea placeholder="Особенности" value={form.specialNeeds} onChange={e => setForm({...form, specialNeeds: e.target.value})} />
             <input placeholder="Ссылка на фото" value={form.photoUrl} onChange={e => setForm({...form, photoUrl: e.target.value})} />

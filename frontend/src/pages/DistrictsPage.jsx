@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { apiFetch as api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { isAdmin } from "../utils/roles";
 
 export default function DistrictsPage() {
+  const { user } = useAuth();
+  const admin = isAdmin(user);
   const [districts, setDistricts] = useState([]);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
@@ -46,19 +50,19 @@ export default function DistrictsPage() {
     <main style={{ padding: 24, maxWidth: 800, margin: "auto" }}>
       <h1>Районы</h1>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
-      <button onClick={() => { setEditing("new"); setName(""); }}>Добавить район</button>
+      {admin && <button onClick={() => { setEditing("new"); setName(""); }}>Добавить район</button>}
 
       <table cellPadding="9" border="1" style={{ width: "100%", marginTop: 16 }}>
-        <thead><tr><th>Название</th><th>Статус</th><th>Действия</th></tr></thead>
+        <thead><tr><th>Название</th><th>Статус</th>{admin && <th>Действия</th>}</tr></thead>
         <tbody>
           {districts.map(d => (
             <tr key={d.id}>
               <td>{d.name}</td>
               <td>{d.enabled ? "Включён" : "Отключён"}</td>
-              <td>
+              {admin && <td>
                 <button onClick={() => { setEditing(d); setName(d.name); }}>Изменить</button>
                 <button onClick={() => toggle(d)}>{d.enabled ? "Отключить" : "Включить"}</button>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

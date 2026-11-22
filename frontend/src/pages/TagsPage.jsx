@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { apiFetch as api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { isEditor } from "../utils/roles";
 
 export default function TagsPage() {
+  const { user } = useAuth();
+  const canEdit = isEditor(user);
   const [tags, setTags] = useState([]);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", color: "#26966f" });
@@ -56,10 +60,10 @@ export default function TagsPage() {
     <main style={{ padding: 24, maxWidth: 800, margin: "auto" }}>
       <h1>Теги</h1>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
-      <button onClick={openCreate}>Добавить тег</button>
+      {canEdit && <button onClick={openCreate}>Добавить тег</button>}
 
       <table cellPadding="9" border="1" style={{ width: "100%", marginTop: 16 }}>
-        <thead><tr><th>Название</th><th>Цвет</th><th>Действия</th></tr></thead>
+        <thead><tr><th>Название</th><th>Цвет</th>{canEdit && <th>Действия</th>}</tr></thead>
         <tbody>
           {tags.map(t => (
             <tr key={t.id}>
@@ -68,10 +72,10 @@ export default function TagsPage() {
                 <span style={{ display: "inline-block", width: 16, height: 16, background: t.color, borderRadius: 4, marginRight: 6 }} />
                 {t.color || "—"}
               </td>
-              <td>
+              {canEdit && <td>
                 <button onClick={() => openEdit(t)}>Изменить</button>
                 <button onClick={() => remove(t)}>Удалить</button>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

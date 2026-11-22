@@ -9,6 +9,7 @@ import {
   People, History, UploadFile, Logout
 } from '@mui/icons-material';
 import { useAuth } from '../auth/AuthContext';
+import { isAdmin } from '../utils/roles';
 
 const DRAWER_WIDTH = 252;
 const GREEN = '#26966f';
@@ -28,8 +29,8 @@ export default function Layout() {
   { label: 'История', icon: <History />, path: '/walk-history' },
   { label: 'CSV', icon: <UploadFile />, path: '/csv' },
   { label: 'Районы', icon: <Map />, path: '/districts' },
-  { label: 'Пользователи', icon: <People />, path: '/users' },
-  { label: 'Аудит', icon: <History />, path: '/audit' },
+  { label: 'Пользователи', icon: <People />, path: '/users', adminOnly: true },
+  { label: 'Аудит', icon: <History />, path: '/audit', adminOnly: true },
 ];
 
   const handleLogout = async () => {
@@ -42,7 +43,7 @@ export default function Layout() {
       <Toolbar sx={{ px: 2.5, minHeight: '76px !important' }}><Box sx={{ width: 38, height: 38, borderRadius: 2.5, bgcolor: '#e6f5ee', color: GREEN, display: 'grid', placeItems: 'center', mr: 1.5, fontSize: 22 }}>🐾</Box><Box><Typography variant="h6" sx={{ color: '#20332b', lineHeight: 1.1 }}>PetGo</Typography><Typography variant="caption" color="text.secondary">Забота о питомцах</Typography></Box></Toolbar>
       <Divider />
       <List>
-        {items.map((item) => (
+        {items.filter(item => !item.adminOnly || isAdmin(user)).map((item) => (
           <ListItemButton
             key={item.path}
             selected={location.pathname === item.path}

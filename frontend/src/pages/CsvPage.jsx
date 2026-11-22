@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { api, apiFetch } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { isEditor } from "../utils/roles";
 
 export default function CsvPage() {
+  const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState("ONLY_NEW");
   const [report, setReport] = useState(null);
@@ -63,7 +66,7 @@ export default function CsvPage() {
         <button onClick={exportCsv}>Скачать CSV</button>
       </section>
 
-      <section style={{ border: "1px solid #aaa", padding: 20 }}>
+      {isEditor(user) && <section style={{ border: "1px solid #aaa", padding: 20 }}>
         <h2>Импорт</h2>
         <input type="file" accept=".csv" onChange={e => setFile(e.target.files[0])} />
         <select value={mode} onChange={e => setMode(e.target.value)}>
@@ -89,7 +92,7 @@ export default function CsvPage() {
             )}
           </div>
         )}
-      </section>
+      </section>}
     </main>
   );
 }

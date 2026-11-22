@@ -72,4 +72,14 @@ export async function apiFetch(url, options = {}) {
   }
 }
 
+export async function fetchAllPages(path, filters = {}) {
+  const items = [];
+  for (let page = 0; ; page++) {
+    const params = new URLSearchParams({ ...filters, page: String(page), size: '100' });
+    const result = await apiFetch(`${path}?${params}`);
+    items.push(...result.content);
+    if (page + 1 >= result.totalPages) return items;
+  }
+}
+
 export const api = axiosInstance;

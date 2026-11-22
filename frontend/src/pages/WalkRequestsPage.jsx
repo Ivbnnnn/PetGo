@@ -1,7 +1,8 @@
 
 import { useEffect, useState } from "react";
-import { apiFetch as api } from "../api/client";
+import { apiFetch as api, fetchAllPages } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { isAdmin, isEditor, isOwner, isWalker } from "../utils/roles";
 
 const emptyForm = {
   petId: "",
@@ -36,7 +37,6 @@ function currentLocalDateTime() {
 
 export default function WalkRequestsPage() {
   const { user } = useAuth();
-  const accessLevel = user?.accessLevel;
   const [requests, setRequests] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -61,6 +61,7 @@ export default function WalkRequestsPage() {
 
   const [owners, setOwners] = useState([]);
   const [pets, setPets] = useState([]);
+  const [petsLoading, setPetsLoading] = useState(false);
   const [walkers, setWalkers] = useState([]);
   const [allTags, setAllTags] = useState([]);
 
@@ -73,8 +74,14 @@ export default function WalkRequestsPage() {
   const [bulkTagId, setBulkTagId] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  const canEdit = accessLevel === "EDITOR" || accessLevel === "ADMIN";
-  const isAdmin = accessLevel === "ADMIN";
+  const admin = isAdmin(user);
+  const canEdit = isEditor(user);
+  const canCreate = admin || isOwner(user);
+  const canManageRequest = item => canEdit || (isOwner(user) && item.ownerId === user.id);
+  const canRunWalk = item => Boolean(item.walkerId) && (admin || (isWalker(user) && item.walkerId === user.id));
+  const creating = editing === "new";
+  const dateChanged = creating || form.scheduledAt !== localDateTimeValue(editing?.scheduledAt);
+  const petOwnerId = creating ? form.ownerId : "";
 
   async function load(overrides = {}) {
     try {
@@ -101,28 +108,35 @@ export default function WalkRequestsPage() {
 
   useEffect(() => {
     load();
+  }, [page, status, sort, archived, tagIdFilter, user.id]);
 
-    async function loadDropdownData() {
-      try {
-        const petsRes = await api('/pets?size=100');
-        setPets(petsRes.content || []);
-
-        const tagsRes = await api('/tags');
-        setAllTags(tagsRes || []);
-
-        if (isAdmin) {
-          const usersRes = await api('/admin/users?size=200');
-          const allUsers = usersRes.content || [];
-          const otherUsers = allUsers.filter(u => u.id !== user.id);
-          setOwners(otherUsers.filter(u => u.role === 'OWNER'));
-          setWalkers(otherUsers.filter(u => u.role === 'WALKER'));
-        }
-      } catch (e) {
-        console.error("Не удалось загрузить данные для списков", e);
-      }
+  useEffect(() => {
+    api("/tags").then(setAllTags).catch(e => setError(e.message));
+    if (admin) {
+      fetchAllPages("/admin/users")
+        .then(users => {
+          setOwners(users.filter(u => u.enabled && isOwner(u)));
+          setWalkers(users.filter(u => u.enabled && isWalker(u)));
+        })
+        .catch(e => setError(e.message));
     }
-    loadDropdownData();
-  }, [page, status, sort, archived, isAdmin, tagIdFilter, user.id]);
+  }, [admin, user.id]);
+
+  useEffect(() => {
+    if (!petOwnerId) {
+      setPets([]);
+      setPetsLoading(false);
+      return;
+    }
+    let active = true;
+    setPets([]);
+    setPetsLoading(true);
+    fetchAllPages("/pets", { ownerId: petOwnerId, sort: "name,asc" })
+      .then(items => { if (active) setPets(items); })
+      .catch(e => { if (active) setError(e.message || "Не удалось загрузить питомцев"); })
+      .finally(() => { if (active) setPetsLoading(false); });
+    return () => { active = false; };
+  }, [petOwnerId]);
 
   async function view(item) {
     try {
@@ -159,8 +173,9 @@ export default function WalkRequestsPage() {
   }
 
   function openCreate() {
+    setError("");
     setEditing("new");
-    setForm({ ...emptyForm, ownerId: isAdmin ? "" : user.id });
+    setForm({ ...emptyForm, ownerId: admin ? "" : user.id });
     setFieldErrors({});
   }
 
@@ -188,12 +203,11 @@ export default function WalkRequestsPage() {
     setError("");
     setFieldErrors({});
 
-    const creating = editing === "new";
     if (!form.scheduledAt) {
       setFieldErrors({ scheduledAt: "Укажите дату и время прогулки" });
       return;
     }
-    if (form.scheduledAt < currentLocalDateTime()) {
+    if (dateChanged && form.scheduledAt < currentLocalDateTime()) {
       setFieldErrors({ scheduledAt: "Выберите дату и время в будущем" });
       setError("Дата прогулки не может быть в прошлом.");
       return;
@@ -202,7 +216,7 @@ export default function WalkRequestsPage() {
     const body = creating
       ? {
           ...form,
-          ownerId: isAdmin ? form.ownerId : user.id,
+          ownerId: admin ? form.ownerId : user.id,
           walkerId: form.walkerId || null,
           durationMinutes: Number(form.durationMinutes),
           price: Number(form.price),
@@ -210,8 +224,8 @@ export default function WalkRequestsPage() {
         }
       : {
           version: editing.version,
-          walkerId: form.walkerId || null,
-          scheduledAt,
+          ...(admin && form.walkerId !== (editing.walkerId ?? "") && { walkerId: form.walkerId }),
+          ...(dateChanged && { scheduledAt }),
           durationMinutes: Number(form.durationMinutes),
           address: form.address,
           description: form.description,
@@ -227,27 +241,18 @@ export default function WalkRequestsPage() {
       setEditing(null);
       await load();
     } catch (e) {
-      if (e.status === 409) {
-        setError("Заявка уже изменена. Обновите список и повторите действие.");
-      } else {
-        setError(e.message || "Ошибка сохранения");
-      }
+      setError(e.message || "Ошибка сохранения");
       setFieldErrors(e.fieldErrors ?? {});
     } finally {
       setSaving(false);
     }
   }
 
-  async function action(item, operation, method = "POST") {
-    if (operation === "start" && !item.walkerId) {
-      setError("Нельзя начать прогулку: сначала назначьте выгульщика в карточке заявки.");
-      openEdit(item);
-      return;
-    }
+  async function action(item, operation) {
     try {
       setBusyAction(`${item.id}:${operation}`);
       setError("");
-      await api(`/walk-requests/${item.id}/${operation}`, { method });
+      await api(`/walk-requests/${item.id}/${operation}`, { method: "POST" });
       await load();
       setSelected(null);
     } catch (e) {
@@ -261,6 +266,7 @@ export default function WalkRequestsPage() {
     try {
       await api(`/walk-requests/${item.id}`, { method: "DELETE" });
       await load();
+      setSelected(null);
     } catch (e) {
       setError(e.message);
     }
@@ -386,7 +392,7 @@ export default function WalkRequestsPage() {
       {label}
       <input
         type={type}
-        min={name === "scheduledAt" ? currentLocalDateTime() : undefined}
+        min={name === "scheduledAt" && dateChanged ? currentLocalDateTime() : undefined}
         value={form[name] ?? ""}
         onChange={e => change(name, e.target.value)}
         required={["scheduledAt", "address"].includes(name)}
@@ -395,15 +401,16 @@ export default function WalkRequestsPage() {
     </label>
   );
 
-  const selectField = (name, label, options, required = false) => (
+  const selectField = (name, label, options, required = false, disabled = false) => (
     <label style={{ display: "grid", gap: 4 }}>
       {label}
       <select
         value={form[name] ?? ""}
         onChange={e => change(name, e.target.value)}
         required={required}
+        disabled={disabled}
       >
-        <option value="">— Выберите —</option>
+        <option value="" disabled={required}>— Выберите —</option>
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
@@ -412,9 +419,7 @@ export default function WalkRequestsPage() {
     </label>
   );
 
-  const availablePets = form.ownerId
-    ? pets.filter(p => p.ownerId === form.ownerId)
-    : pets;
+  const availablePets = pets.filter(p => p.ownerId === petOwnerId);
 
   return (
     <main className="walk-page">
@@ -459,7 +464,7 @@ export default function WalkRequestsPage() {
           Архив
         </label>
 
-        {(canEdit || user?.role === "OWNER") && (
+        {canCreate && (
           <button className="walk-btn" type="button" onClick={openCreate}>
             Добавить заявку
           </button>
@@ -543,13 +548,13 @@ export default function WalkRequestsPage() {
                 </td>
                 <td>
                   <button className="walk-btn" onClick={() => view(item)}>Открыть</button>
-                  {canEdit && !item.isArchived && (
+                  {canManageRequest(item) && !item.isArchived && !["COMPLETED", "CANCELLED"].includes(item.status) && (
                     <button className="walk-btn" onClick={() => openEdit(item)}>Изменить</button>
                   )}
-                  {canEdit && !item.isArchived && item.status === "CREATED" && (
+                  {canRunWalk(item) && !item.isArchived && item.status === "CREATED" && (
                     <button className="walk-btn walk-btn--primary" disabled={!!busyAction} onClick={() => action(item, "start")}>Начать</button>
                   )}
-                  {canEdit && !item.isArchived && item.status === "IN_PROGRESS" && (
+                  {canRunWalk(item) && !item.isArchived && item.status === "IN_PROGRESS" && (
                     <button className="walk-btn walk-btn--primary" disabled={!!busyAction} onClick={() => action(item, "complete")}>Завершить</button>
                   )}
                 </td>
@@ -569,7 +574,7 @@ export default function WalkRequestsPage() {
         <section className="walk-form-card">
           <h2>{editing === "new" ? "Создание заявки" : "Редактирование заявки"}</h2>
           <form onSubmit={save} className="walk-form-grid">
-            {isAdmin && (
+            {admin && creating && (
               <label style={{ display: "grid", gap: 4 }}>
                 Владелец
                 <select
@@ -584,9 +589,11 @@ export default function WalkRequestsPage() {
               </label>
             )}
 
-            {selectField("petId", "Питомец", availablePets.map(p => ({ value: p.id, label: p.name })), true)}
+            {creating && selectField("petId", "Питомец",
+              availablePets.map(p => ({ value: p.id, label: p.name })), true, !petOwnerId || petsLoading)}
 
-            {isAdmin && selectField("walkerId", "Выгульщик", walkers.map(w => ({ value: w.id, label: w.username })))}
+            {admin && selectField("walkerId", "Выгульщик",
+              walkers.map(w => ({ value: w.id, label: w.username })), Boolean(editing?.walkerId))}
 
             {textField("scheduledAt", "Дата и время", "datetime-local")}
             {textField("durationMinutes", "Длительность", "number")}
@@ -595,7 +602,10 @@ export default function WalkRequestsPage() {
             {textField("description", "Описание")}
 
             <div>
-              <button className="walk-btn walk-btn--primary" type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Сохранить"}</button>
+              <button className="walk-btn walk-btn--primary" type="submit"
+                disabled={saving || (creating && !availablePets.some(pet => pet.id === form.petId))}>
+                {saving ? "Сохраняем…" : "Сохранить"}
+              </button>
               <button className="walk-btn" type="button" disabled={saving} onClick={() => setEditing(null)}>Отмена</button>
             </div>
           </form>
@@ -607,6 +617,20 @@ export default function WalkRequestsPage() {
           <h2>Заявка {selected.externalId}</h2>
           <p>Адрес: {selected.address}</p>
           <p>Описание: {selected.description || "—"}</p>
+          {canManageRequest(selected) && (
+            <div>
+              {selected.isArchived ? (
+                <button className="walk-btn" disabled={!!busyAction} onClick={() => action(selected, "restore")}>Восстановить из архива</button>
+              ) : (
+                <>
+                  {!["COMPLETED", "CANCELLED"].includes(selected.status) && (
+                    <button className="walk-btn" disabled={!!busyAction} onClick={() => action(selected, "cancel")}>Отменить заявку</button>
+                  )}
+                  <button className="walk-btn" onClick={() => archive(selected)}>В архив</button>
+                </>
+              )}
+            </div>
+          )}
 
           <div style={{ margin: "16px 0" }}>
             <h3>Теги</h3>
@@ -650,7 +674,7 @@ export default function WalkRequestsPage() {
             <div key={note.id} style={{ marginBottom: 8 }}>
               {note.pinned && "📌 "}
               {note.content}
-              {canEdit && (
+              {canEdit && (admin || note.authorId === user.id) && (
                 <span style={{ marginLeft: 8 }}>
                   <button className="walk-btn" onClick={() => noteAction(note, note.pinned ? "/unpin" : "/pin")}>
                     {note.pinned ? "Открепить" : "Закрепить"}
